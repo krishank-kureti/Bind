@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,4 +5,153 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  displayName   String?
+  avatarUrl     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      ConnectedAccount[]
+  sessions      Session[]
+
+  @@map("users")
+}
+
+model ConnectedAccount {
+  id                String     @id @default(cuid())
+  userId            String
+  provider          String     @default("google")
+  providerAccountId String
+  email             String
+  displayName       String?
+  avatarUrl         String?
+  accessToken       String
+  refreshToken      String
+  tokenExpiresAt    DateTime?
+  scopes            String[]
+  isActive          Boolean    @default(true)
+  lastSyncedAt      DateTime?
+  syncStatus        SyncStatus @default(PENDING)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  files           FileIndex[]
+  storageQuota    StorageQuota?
+
+  @@unique([userId, providerAccountId])
+  @@map("connected_accounts")
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCING
+  SYNCED
+  ERROR
+}
+
+model FileIndex {
+  id                 String    @id @default(cuid())
+  accountId          String
+  providerId         String
+  name               String
+  mimeType           String
+  size               BigInt?
+  isFolder           Boolean   @default(false)
+  isTrashed          Boolean   @default(false)
+  parentFolderId     String?
+  fullPath           String?
+  createdAtProvider  DateTime?
+  modifiedAtProvider DateTime?
+  webViewLink        String?
+  webContentLink     String?
+  iconLink           String?
+  thumbnailLink      String?
+  starred            Boolean   @default(false)
+  md5Checksum        String?
+  sha256Checksum     String?
+  searchVector       Unsupported("tsvector")?
+  indexedAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  account ConnectedAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, providerId])
+  @@index([accountId])
+  @@index([name])
+  @@index([mimeType])
+  @@index([parentFolderId])
+  @@index([md5Checksum])
+  @@map("file_index")
+}
+
+model StorageQuota {
+  id          String   @id @default(cuid())
+  accountId   String   @unique
+  totalBytes  BigInt
+  usedBytes   BigInt
+  driveBytes  BigInt?
+  gmailBytes  BigInt?
+  photosBytes BigInt?
+  trashBytes  BigInt?
+  refreshedAt DateTime @default(now())
+
+  account ConnectedAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("storage_quotas")
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  data      Json
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model UploadJob {
+  id              String       @id @default(cuid())
+  userId          String
+  targetAccountId String
+  fileName        String
+  mimeType        String
+  sizeBytes       BigInt?
+  targetFolderId  String?
+  status          UploadStatus @default(PENDING)
+  progress        Int          @default(0)
+  errorMessage    String?
+  resultFileId    String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@map("upload_jobs")
+}
+
+enum UploadStatus {
+  PENDING
+  UPLOADING
+  COMPLETE
+  FAILED
+}
+
+model DuplicateGroup {
+  id         String   @id @default(cuid())
+  userId     String
+  checksum   String
+  fileSize   BigInt?
+  fileCount  Int
+  totalWaste BigInt?
+  detectedAt DateTime @default(now())
+  resolvedAt DateTime?
+
+  @@index([userId])
+  @@map("duplicate_groups")
 }
