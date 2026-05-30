@@ -2,6 +2,9 @@ import app from './app.js';
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
 import { prisma } from './config/prisma.js';
+import { syncQueue } from './workers/queue.js';
+import { createIndexWorker } from './workers/indexFiles.worker.js';
+import { createSyncWorker } from './workers/syncAccount.worker.js';
 
 async function main(): Promise<void> {
   await prisma.$connect();
@@ -15,9 +18,38 @@ async function main(): Promise<void> {
     logger.warn('Redis not available — sessions and queues will not work');
   }
 
+  // Start BullMQ workers
+  const indexWorker = createIndexWorker();
+  const syncWorker = createSyncWorker();
+  logger.info('BullMQ workers started');
+
+  // Schedule periodic sync (every 30 minutes)
+  await syncQueue.add(
+    'periodicSync',
+    {},
+    {
+      repeat: { pattern: '*/30 * * * *' },
+      removeOnComplete: true,
+      removeOnFail: true,
+    },
+  );
+  logger.info('Periodic sync scheduled (every 30 min)');
+
   app.listen(env.PORT, () => {
     logger.info({ port: env.PORT }, `Server running on ${env.APP_URL}`);
   });
+
+  const shutdown = async () => {
+    logger.info('Shutting down...');
+    await indexWorker.close();
+    await syncWorker.close();
+    await prisma.$disconnect();
+    redis.disconnect();
+    process.exit(0);
+  };
+
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 }
 
 main().catch((err) => {

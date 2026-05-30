@@ -15,6 +15,9 @@ import { logger } from './utils/logger.js';
 import './config/passport.js';
 import authRoutes from './routes/auth.routes.js';
 import accountRoutes from './routes/accounts.routes.js';
+import fileRoutes from './routes/files.routes.js';
+import folderRoutes from './routes/folders.routes.js';
+import searchRoutes from './routes/search.routes.js';
 
 // Allow BigInt serialization in JSON responses
 (BigInt.prototype as unknown as Record<string, unknown>).toJSON = function () {
@@ -24,7 +27,15 @@ import accountRoutes from './routes/accounts.routes.js';
 const app = express();
 
 // Security
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https://lh3.googleusercontent.com"],
+    },
+  },
+}));
 app.use(cors({
   origin: env.FRONTEND_URL,
   credentials: true,
@@ -63,6 +74,9 @@ app.use(express.static(path.resolve('public')));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/accounts', accountRoutes);
+app.use('/api/files', fileRoutes);
+app.use('/api/folders', folderRoutes);
+app.use('/api/search', searchRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

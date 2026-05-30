@@ -3,6 +3,7 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { prisma } from './prisma.js';
 import { env } from './env.js';
 import { encrypt } from '../utils/encryption.js';
+import { indexQueue } from '../workers/queue.js';
 
 passport.serializeUser((user: Express.User, done) => {
   done(null, user.id);
@@ -65,8 +66,9 @@ passport.use(new GoogleStrategy({
             isActive: true,
           },
         });
+        await indexQueue.add('indexAccount', { accountId: existing.id });
       } else {
-        await prisma.connectedAccount.create({
+        const newAccount = await prisma.connectedAccount.create({
           data: {
             userId: req.user.id,
             provider: 'google',
@@ -80,27 +82,29 @@ passport.use(new GoogleStrategy({
             scopes: ['drive'],
           },
         });
+        await indexQueue.add('indexAccount', { accountId: newAccount.id });
       }
 
       done(null, req.user);
       return;
     }
 
-    const account = await prisma.connectedAccount.findFirst({
+    const existingAccount = await prisma.connectedAccount.findFirst({
       where: { providerAccountId: googleAccountId, provider: 'google' },
       include: { user: true },
     });
 
-    if (account) {
+    if (existingAccount) {
       await prisma.connectedAccount.update({
-        where: { id: account.id },
+        where: { id: existingAccount.id },
         data: {
           accessToken: encAccessToken,
-          refreshToken: refreshToken ? encRefreshToken : account.refreshToken,
+          refreshToken: refreshToken ? encRefreshToken : existingAccount.refreshToken,
           tokenExpiresAt,
         },
       });
-      done(null, account.user);
+      await indexQueue.add('indexAccount', { accountId: existingAccount.id });
+      done(null, existingAccount.user);
       return;
     }
 
@@ -109,23 +113,26 @@ passport.use(new GoogleStrategy({
         email,
         displayName,
         avatarUrl,
-        accounts: {
-          create: {
-            provider: 'google',
-            providerAccountId: googleAccountId,
-            email,
-            displayName,
-            avatarUrl,
-            accessToken: encAccessToken,
-            refreshToken: encRefreshToken,
-            tokenExpiresAt,
-            scopes: ['drive'],
-          },
-        },
       },
       select: { id: true, email: true, displayName: true, avatarUrl: true },
     });
 
+    const newAccount = await prisma.connectedAccount.create({
+      data: {
+        userId: user.id,
+        provider: 'google',
+        providerAccountId: googleAccountId,
+        email,
+        displayName,
+        avatarUrl,
+        accessToken: encAccessToken,
+        refreshToken: encRefreshToken,
+        tokenExpiresAt,
+        scopes: ['drive'],
+      },
+    });
+
+    await indexQueue.add('indexAccount', { accountId: newAccount.id });
     done(null, user);
   } catch (err) {
     done(err);

@@ -5,6 +5,49 @@ if (params.get('error')) {
   el.style.display = 'block';
 }
 
+async function triggerSync(accountId, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Syncing…';
+  try {
+    const res = await fetch('/api/accounts/' + accountId + '/sync', { method: 'POST' });
+    if (!res.ok) throw new Error('Sync failed');
+    // Poll status a few times
+    pollStatus(accountId, btn);
+  } catch {
+    btn.disabled = false;
+    btn.textContent = 'Retry';
+  }
+}
+
+async function pollStatus(accountId, btn) {
+  let attempts = 0;
+  const maxAttempts = 12;
+  const poll = async () => {
+    try {
+      const res = await fetch('/api/accounts/' + accountId + '/status');
+      const body = await res.json();
+      if (!body.success) return;
+      const status = body.data.syncStatus;
+      const badge = document.querySelector('[data-account-id="' + accountId + '"] .badge');
+      if (badge) {
+        badge.className = 'badge badge-' + status.toLowerCase();
+        badge.textContent = status;
+      }
+      if (status === 'SYNCED' || status === 'ERROR' || attempts >= maxAttempts) {
+        btn.disabled = false;
+        btn.textContent = 'Sync';
+        return;
+      }
+      attempts++;
+      setTimeout(poll, 2000);
+    } catch {
+      btn.disabled = false;
+      btn.textContent = 'Sync';
+    }
+  };
+  setTimeout(poll, 2000);
+}
+
 async function loadAuthState() {
   try {
     const res = await fetch('/api/auth/me');
@@ -32,6 +75,7 @@ async function loadAuthState() {
     accounts.forEach(acc => {
       const div = document.createElement('div');
       div.className = 'account-item';
+      div.setAttribute('data-account-id', acc.id);
 
       const initial = (acc.displayName || acc.email)[0].toUpperCase();
       const badgeClass = 'badge-' + (acc.syncStatus || 'pending').toLowerCase();
@@ -47,8 +91,15 @@ async function loadAuthState() {
             </div>
           </div>
         </div>
-        <div style="color:#888;font-size:13px;">${acc.provider}</div>
+        <div>
+          <button class="btn btn-outline btn-sm sync-btn">Sync</button>
+          <span style="color:#888;font-size:13px;margin-left:8px;">${acc.provider}</span>
+        </div>
       `;
+
+      const syncBtn = div.querySelector('.sync-btn');
+      syncBtn.addEventListener('click', () => triggerSync(acc.id, syncBtn));
+
       list.appendChild(div);
     });
   } catch (err) {
