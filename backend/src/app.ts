@@ -1,13 +1,20 @@
+import path from 'node:path';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import session from 'express-session';
-import { RedisStore } from 'connect-redis';
+import passport from 'passport';
+import connectRedis = require('connect-redis');
+const RedisStore = connectRedis(session);
 import { env } from './config/env.js';
 import { redis } from './config/redis.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { logger } from './utils/logger.js';
+
+import './config/passport.js';
+import authRoutes from './routes/auth.routes.js';
+import accountRoutes from './routes/accounts.routes.js';
 
 // Allow BigInt serialization in JSON responses
 (BigInt.prototype as unknown as Record<string, unknown>).toJSON = function () {
@@ -45,6 +52,17 @@ app.use(session({
     maxAge: 24 * 60 * 60 * 1000,
   },
 }));
+
+// Passport
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Static files (test page)
+app.use(express.static(path.resolve('public')));
+
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/accounts', accountRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
