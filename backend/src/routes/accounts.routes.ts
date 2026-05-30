@@ -1,6 +1,6 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { requireAuth } from '../middleware/auth.middleware.js';
-import { getUserAccounts, deactivateAccount } from '../services/auth.service.js';
+import { getUserAccounts } from '../services/auth.service.js';
 import { indexQueue } from '../workers/queue.js';
 import { prisma } from '../config/prisma.js';
 
@@ -52,7 +52,11 @@ router.delete('/:accountId', async (req: Request, res: Response, next: NextFunct
   try {
     const userId = (req.user as Express.User).id;
     const accountId = req.params.accountId as string;
-    const account = await deactivateAccount(accountId, userId);
+
+    const account = await prisma.connectedAccount.findFirst({
+      where: { id: accountId, userId, isActive: true },
+    });
+
     if (!account) {
       res.status(404).json({
         success: false,
@@ -60,7 +64,12 @@ router.delete('/:accountId', async (req: Request, res: Response, next: NextFunct
       });
       return;
     }
-    res.json({ success: true, data: { id: account.id, isActive: false } });
+
+    await prisma.connectedAccount.delete({
+      where: { id: accountId },
+    });
+
+    res.json({ success: true, data: { id: account.id, deleted: true } });
   } catch (err) {
     next(err);
   }

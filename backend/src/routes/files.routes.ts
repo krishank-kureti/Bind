@@ -1,6 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { prisma } from '../config/prisma.js';
+import { downloadFile } from '../services/drive.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 
 const router = Router();
@@ -99,6 +100,37 @@ router.get('/:fileId', async (req: Request, res: Response, next: NextFunction) =
     }
 
     res.json({ success: true, data: file });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/:fileId/download', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req.user as Express.User).id;
+    const fileId = req.params.fileId as string;
+
+    const file = await prisma.fileIndex.findUnique({ where: { id: fileId } });
+    if (!file) {
+      res.status(404).json({ success: false, error: { code: 'FILE_NOT_FOUND', message: 'File not found' } });
+      return;
+    }
+
+    const account = await prisma.connectedAccount.findFirst({
+      where: { id: file.accountId, userId },
+      select: { id: true },
+    });
+
+    if (!account) {
+      res.status(404).json({ success: false, error: { code: 'FILE_NOT_FOUND', message: 'File not found' } });
+      return;
+    }
+
+    const { stream, mimeType, name } = await downloadFile(account.id, file.providerId);
+
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+    stream.pipe(res);
   } catch (err) {
     next(err);
   }

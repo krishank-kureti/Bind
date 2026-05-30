@@ -2,9 +2,11 @@ import app from './app.js';
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
 import { prisma } from './config/prisma.js';
+import { existsSync, mkdirSync } from 'node:fs';
 import { syncQueue } from './workers/queue.js';
 import { createIndexWorker } from './workers/indexFiles.worker.js';
 import { createSyncWorker } from './workers/syncAccount.worker.js';
+import { createUploadWorker } from './workers/processUpload.worker.js';
 
 async function main(): Promise<void> {
   await prisma.$connect();
@@ -18,9 +20,16 @@ async function main(): Promise<void> {
     logger.warn('Redis not available — sessions and queues will not work');
   }
 
+  // Ensure uploads directory exists
+  const uploadsDir = 'uploads';
+  if (!existsSync(uploadsDir)) {
+    mkdirSync(uploadsDir);
+  }
+
   // Start BullMQ workers
   const indexWorker = createIndexWorker();
   const syncWorker = createSyncWorker();
+  const uploadWorker = createUploadWorker();
   logger.info('BullMQ workers started');
 
   // Schedule periodic sync (every 30 minutes)
@@ -43,6 +52,7 @@ async function main(): Promise<void> {
     logger.info('Shutting down...');
     await indexWorker.close();
     await syncWorker.close();
+    await uploadWorker.close();
     await prisma.$disconnect();
     redis.disconnect();
     process.exit(0);

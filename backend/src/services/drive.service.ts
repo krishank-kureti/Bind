@@ -1,5 +1,6 @@
 import { google, drive_v3 } from 'googleapis';
 import { getValidAccessToken } from './token.service.js';
+import { type Readable } from 'stream';
 
 const FILE_FIELDS = [
   'id', 'name', 'mimeType', 'size', 'parents',
@@ -45,4 +46,54 @@ export async function getStorageQuota(accountId: string) {
   });
 
   return res.data.storageQuota;
+}
+
+export async function uploadFile(
+  accountId: string,
+  fileName: string,
+  mimeType: string,
+  stream: Readable,
+  parentFolderId?: string,
+): Promise<drive_v3.Schema$File> {
+  const token = await getValidAccessToken(accountId);
+  const drive = getDriveClient(token);
+
+  const res = await drive.files.create({
+    requestBody: {
+      name: fileName,
+      parents: parentFolderId ? [parentFolderId] : undefined,
+    },
+    media: {
+      mimeType,
+      body: stream,
+    },
+    fields: 'id,name,mimeType,size,webViewLink,webContentLink,parents',
+  });
+
+  return res.data;
+}
+
+export async function downloadFile(
+  accountId: string,
+  fileId: string,
+): Promise<{ stream: Readable; mimeType: string; name: string; size: string | null }> {
+  const token = await getValidAccessToken(accountId);
+  const drive = getDriveClient(token);
+
+  const meta = await drive.files.get({
+    fileId,
+    fields: 'name,mimeType,size',
+  });
+
+  const res = await drive.files.get(
+    { fileId, alt: 'media' },
+    { responseType: 'stream' },
+  );
+
+  return {
+    stream: res.data as unknown as Readable,
+    mimeType: meta.data.mimeType ?? 'application/octet-stream',
+    name: meta.data.name ?? 'file',
+    size: meta.data.size ?? null,
+  };
 }

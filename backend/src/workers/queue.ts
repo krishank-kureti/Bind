@@ -23,3 +23,13 @@ export const syncQueue = new Queue('sync-queue', {
     removeOnFail: 20,
   },
 });
+
+export const uploadQueue = new Queue('upload-queue', {
+  connection,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 5000 },
+    removeOnComplete: 50,
+    removeOnFail: 10,
+  },
+});
