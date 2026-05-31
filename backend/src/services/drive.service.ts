@@ -97,3 +97,79 @@ export async function downloadFile(
     size: meta.data.size ?? null,
   };
 }
+
+export async function renameFile(accountId: string, providerId: string, newName: string): Promise<void> {
+  const token = await getValidAccessToken(accountId);
+  const drive = getDriveClient(token);
+  await drive.files.update({
+    fileId: providerId,
+    requestBody: { name: newName },
+  });
+}
+
+export async function moveFile(accountId: string, providerId: string, newParentId: string, oldParentId: string | null): Promise<void> {
+  const token = await getValidAccessToken(accountId);
+  const drive = getDriveClient(token);
+  await drive.files.update({
+    fileId: providerId,
+    addParents: newParentId,
+    removeParents: oldParentId ?? undefined,
+  });
+}
+
+export async function toggleStarFile(accountId: string, providerId: string, starred: boolean): Promise<void> {
+  const token = await getValidAccessToken(accountId);
+  const drive = getDriveClient(token);
+  await drive.files.update({
+    fileId: providerId,
+    requestBody: { starred },
+  });
+}
+
+export async function trashFile(accountId: string, providerId: string): Promise<void> {
+  const token = await getValidAccessToken(accountId);
+  const drive = getDriveClient(token);
+  await drive.files.update({
+    fileId: providerId,
+    requestBody: { trashed: true },
+  });
+}
+
+export async function restoreFile(accountId: string, providerId: string): Promise<void> {
+  const token = await getValidAccessToken(accountId);
+  const drive = getDriveClient(token);
+  await drive.files.update({
+    fileId: providerId,
+    requestBody: { trashed: false },
+  });
+}
+
+export async function permanentlyDeleteFile(accountId: string, providerId: string): Promise<void> {
+  const token = await getValidAccessToken(accountId);
+  const drive = getDriveClient(token);
+  await drive.files.delete({ fileId: providerId });
+}
+
+export async function copyFile(accountId: string, providerId: string): Promise<drive_v3.Schema$File> {
+  const token = await getValidAccessToken(accountId);
+  const drive = getDriveClient(token);
+  const res = await drive.files.copy({
+    fileId: providerId,
+    fields: FILE_FIELDS,
+  });
+  return res.data;
+}
+
+export async function createDriveFolder(accountId: string, name: string, parentId?: string): Promise<drive_v3.Schema$File> {
+  const token = await getValidAccessToken(accountId);
+  const drive = getDriveClient(token);
+  const res = await drive.files.create({
+    requestBody: {
+      name,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: parentId ? [parentId] : undefined,
+    },
+    fields: FILE_FIELDS,
+  });
+  return res.data;
+}

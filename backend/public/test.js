@@ -5,6 +5,19 @@ if (params.get('error')) {
   el.style.display = 'block';
 }
 
+const ACCOUNT_COLORS = ['#4285f4','#ea4335','#fbbc04','#34a853','#ff6d01','#46bdc6','#7baaf7','#ab47bc'];
+
+function getAccountColor(email) {
+  const index = email.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % ACCOUNT_COLORS.length;
+  return ACCOUNT_COLORS[index];
+}
+
+let selectedFiles = new Set();
+let currentFilesData = [];
+let pageCursor = null;
+let hasMorePages = false;
+let currentQuery = '';
+
 async function triggerSync(accountId, btn) {
   btn.disabled = true;
   btn.textContent = 'Syncing…';
@@ -118,6 +131,7 @@ async function loadAuthState() {
     });
 
     refreshAllQuotas();
+    loadFiles();
   } catch (err) {
     document.getElementById('loading-view').classList.add('hidden');
     document.getElementById('unauthenticated-view').classList.remove('hidden');
@@ -219,9 +233,252 @@ function pollUploadJob(jobId, statusEl) {
   setTimeout(poll, 2000);
 }
 
+async function loadFiles(query, append) {
+  const list = document.getElementById('files-list');
+  if (!append) list.innerHTML = '<div class="loading">Loading files...</div>';
+
+  currentQuery = query || '';
+
+  try {
+    let url = '/api/files?limit=50';
+    if (query) url += '&query=' + encodeURIComponent(query);
+    if (append && pageCursor) url += '&cursor=' + pageCursor;
+    const res = await fetch(url);
+    const body = await res.json();
+    if (!body.success) return;
+
+    const meta = body.meta;
+    if (append) {
+      currentFilesData = currentFilesData.concat(body.data || []);
+    } else {
+      currentFilesData = body.data || [];
+      selectedFiles = new Set();
+    }
+    pageCursor = meta.nextCursor;
+    hasMorePages = meta.hasMore;
+    renderFiles();
+  } catch {
+    if (!append) list.innerHTML = '<div class="loading">Failed to load files.</div>';
+  }
+}
+
+function renderFiles() {
+  const list = document.getElementById('files-list');
+  const bulkActions = document.getElementById('bulk-actions');
+
+  if (currentFilesData.length === 0) {
+    list.innerHTML = '<div class="loading">No files found. Sync an account first.</div>';
+    bulkActions.style.display = 'none';
+    return;
+  }
+
+  list.innerHTML = '';
+  currentFilesData.forEach(file => {
+    const div = document.createElement('div');
+    div.className = 'file-item';
+
+    const color = getAccountColor(file.account.email);
+    const label = (file.account.displayName || file.account.email)[0].toUpperCase();
+    const isChecked = selectedFiles.has(file.id);
+
+    div.innerHTML = `
+      <input type="checkbox" class="file-checkbox" data-id="${file.id}" ${isChecked ? 'checked' : ''}>
+      <span class="account-chip" style="background:${color}" title="${file.account.email}">${label}</span>
+      <span class="account-tag" title="${file.account.email}">${file.account.email}</span>
+      <span class="file-name" title="${file.name}">${file.name}</span>
+      <span class="file-meta">${file.size ? (Number(file.size) / 1024).toFixed(0) + ' KB' : ''}</span>
+      <span class="menu-container">
+        <button class="menu-trigger">···</button>
+        <div class="menu-dropdown">
+          <button class="menu-item rename-btn">Rename</button>
+          <button class="menu-item move-btn">Move</button>
+          <button class="menu-item star-btn">${file.starred ? 'Unstar' : 'Star'}</button>
+          <button class="menu-item trash-btn">Trash</button>
+          <button class="menu-item copy-btn">Copy</button>
+          <button class="menu-item danger delete-btn">Delete</button>
+        </div>
+      </span>
+    `;
+
+    const checkbox = div.querySelector('.file-checkbox');
+    checkbox.addEventListener('change', () => {
+      if (checkbox.checked) selectedFiles.add(file.id);
+      else selectedFiles.delete(file.id);
+      updateBulkActions();
+    });
+
+    const trigger = div.querySelector('.menu-trigger');
+    const dropdown = div.querySelector('.menu-dropdown');
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const wasOpen = dropdown.classList.contains('open');
+      closeAllMenus();
+      if (!wasOpen) dropdown.classList.add('open');
+    });
+
+    dropdown.querySelector('.rename-btn').addEventListener('click', async () => {
+      closeAllMenus();
+      const name = prompt('New name:', file.name);
+      if (!name || name === file.name) return;
+      try {
+        const r = await fetch('/api/files/' + file.id + '/rename', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+        const body = await r.json();
+        if (!r.ok) throw new Error(body?.error?.message || 'Rename failed');
+        loadFiles(document.getElementById('search-query').value);
+      } catch (err) { alert(err.message); }
+    });
+
+    dropdown.querySelector('.move-btn').addEventListener('click', async () => {
+      closeAllMenus();
+      const folderId = prompt('Target folder ID:');
+      if (!folderId) return;
+      try {
+        const r = await fetch('/api/files/' + file.id + '/move', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ folderId }),
+        });
+        const body = await r.json();
+        if (!r.ok) throw new Error(body?.error?.message || 'Move failed');
+        loadFiles(document.getElementById('search-query').value);
+      } catch (err) { alert(err.message); }
+    });
+
+    dropdown.querySelector('.star-btn').addEventListener('click', async () => {
+      closeAllMenus();
+      try {
+        const r = await fetch('/api/files/' + file.id + '/star', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ starred: !file.starred }),
+        });
+        const body = await r.json();
+        if (!r.ok) throw new Error(body?.error?.message || 'Star failed');
+        loadFiles(document.getElementById('search-query').value);
+      } catch (err) { alert(err.message); }
+    });
+
+    dropdown.querySelector('.trash-btn').addEventListener('click', async () => {
+      closeAllMenus();
+      if (!confirm('Trash "' + file.name + '"?')) return;
+      try {
+        const r = await fetch('/api/files/' + file.id + '/trash', { method: 'POST' });
+        const body = await r.json();
+        if (!r.ok) throw new Error(body?.error?.message || 'Trash failed');
+        loadFiles(document.getElementById('search-query').value);
+      } catch (err) { alert(err.message); }
+    });
+
+    dropdown.querySelector('.copy-btn').addEventListener('click', async () => {
+      closeAllMenus();
+      try {
+        const r = await fetch('/api/files/' + file.id + '/copy', { method: 'POST' });
+        const body = await r.json();
+        if (!r.ok) throw new Error(body?.error?.message || 'Copy failed');
+        loadFiles(document.getElementById('search-query').value);
+      } catch (err) { alert(err.message); }
+    });
+
+    dropdown.querySelector('.delete-btn').addEventListener('click', async () => {
+      closeAllMenus();
+      if (!confirm('Permanently delete "' + file.name + '"? This cannot be undone.')) return;
+      try {
+        const r = await fetch('/api/files/' + file.id, { method: 'DELETE' });
+        const body = await r.json();
+        if (!r.ok) throw new Error(body?.error?.message || 'Delete failed');
+        loadFiles(document.getElementById('search-query').value);
+      } catch (err) { alert(err.message); }
+    });
+
+    list.appendChild(div);
+  });
+
+  if (hasMorePages) {
+    const moreDiv = document.createElement('div');
+    moreDiv.style.cssText = 'text-align:center;padding:12px 0;';
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-outline btn-sm';
+    btn.textContent = 'Load More';
+    btn.addEventListener('click', () => loadMore());
+    moreDiv.appendChild(btn);
+    list.appendChild(moreDiv);
+  }
+
+  updateBulkActions();
+}
+
+function loadMore() {
+  loadFiles(currentQuery, true);
+}
+
+function closeAllMenus() {
+  document.querySelectorAll('.menu-dropdown.open').forEach(el => el.classList.remove('open'));
+}
+
+document.addEventListener('click', closeAllMenus);
+
+function updateBulkActions() {
+  const el = document.getElementById('bulk-actions');
+  const countEl = document.getElementById('selected-count');
+  const count = selectedFiles.size;
+  if (count > 0) {
+    el.style.display = 'flex';
+    countEl.textContent = count + ' selected';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+async function bulkTrash() {
+  const fileIds = Array.from(selectedFiles);
+  if (!confirm('Trash ' + fileIds.length + ' files?')) return;
+  try {
+    const r = await fetch('/api/files/batch/trash', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileIds }),
+    });
+    if (!r.ok) throw new Error('Bulk trash failed');
+    loadFiles(document.getElementById('search-query').value);
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function bulkDelete() {
+  const fileIds = Array.from(selectedFiles);
+  if (!confirm('Permanently delete ' + fileIds.length + ' files? This cannot be undone.')) return;
+  try {
+    const r = await fetch('/api/files/batch/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileIds }),
+    });
+    if (!r.ok) throw new Error('Bulk delete failed');
+    loadFiles(document.getElementById('search-query').value);
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('refresh-quota-btn').addEventListener('click', refreshAllQuotas);
   document.getElementById('upload-btn').addEventListener('click', uploadFile);
+  document.getElementById('search-btn').addEventListener('click', () => {
+    loadFiles(document.getElementById('search-query').value);
+  });
+  document.getElementById('search-query').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') loadFiles(e.target.value);
+  });
+  document.getElementById('refresh-files-btn').addEventListener('click', () => {
+    loadFiles(document.getElementById('search-query').value);
+  });
+  document.getElementById('bulk-trash-btn').addEventListener('click', bulkTrash);
+  document.getElementById('bulk-delete-btn').addEventListener('click', bulkDelete);
 });
 
 loadAuthState();

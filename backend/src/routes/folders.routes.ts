@@ -4,6 +4,8 @@ import { prisma } from '../config/prisma.js';
 
 const router = Router();
 
+const accountSelect = { select: { email: true, displayName: true } };
+
 router.use(requireAuth);
 
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
@@ -29,6 +31,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         parentFolderId: null,
       },
       orderBy: { name: 'asc' },
+      include: { account: accountSelect },
     });
 
     res.json({ success: true, data: folders });
@@ -60,11 +63,12 @@ router.get('/:folderId/contents', async (req: Request, res: Response, next: Next
 
     const total = await prisma.fileIndex.count({ where });
 
-    const cursorClause = cursor ? { id: { lt: cursor } } : {};
     const files = await prisma.fileIndex.findMany({
-      where: { ...where, ...cursorClause },
+      where,
       take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       orderBy: [{ isFolder: 'desc' }, { name: 'asc' }, { id: 'desc' }],
+      include: { account: accountSelect },
     });
 
     const hasMore = files.length > limit;

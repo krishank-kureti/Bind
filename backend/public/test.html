@@ -45,6 +45,20 @@
   .progress-fill { height:100%; background:#4285f4; border-radius:2px; transition:width 0.3s; }
   .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
   .loading { text-align: center; padding: 40px; color: #888; }
+  .file-item { display:flex; align-items:center; gap:6px; padding:8px 0; border-bottom:1px solid #eee; font-size:13px; }
+  .file-item:last-child { border-bottom:none; }
+  .file-name { flex:1; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .file-meta { font-size:11px; color:#888; flex-shrink:0; }
+  .account-chip { width:18px; height:18px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; color:#fff; flex-shrink:0; }
+  .account-tag { font-size:10px; color:#888; max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex-shrink:0; }
+  .menu-container { position:relative; flex-shrink:0; }
+  .menu-trigger { background:none; border:1px solid #ddd; border-radius:4px; cursor:pointer; padding:2px 6px; font-size:14px; line-height:1; color:#666; }
+  .menu-trigger:hover { background:#f0f0f0; }
+  .menu-dropdown { display:none; position:absolute; right:0; top:100%; z-index:10; background:#fff; border:1px solid #ddd; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.12); min-width:140px; padding:4px 0; margin-top:4px; }
+  .menu-dropdown.open { display:block; }
+  .menu-item { display:block; width:100%; text-align:left; padding:8px 14px; font-size:12px; border:none; background:none; cursor:pointer; color:#333; }
+  .menu-item:hover { background:#f5f5f5; }
+  .menu-item.danger { color:#ea4335; }
 </style>
 </head>
 <body>
@@ -98,9 +112,19 @@
     </div>
 
     <div class="card">
-      <h2>Upload Jobs</h2>
-      <div id="upload-jobs-list">
-        <div class="loading" style="padding:12px;">No recent uploads.</div>
+      <h2>File Browser</h2>
+      <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
+        <input type="text" id="search-query" placeholder="Search files..." style="flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
+        <button id="search-btn" class="btn btn-outline btn-sm">Search</button>
+        <button id="refresh-files-btn" class="btn btn-outline btn-sm">Refresh</button>
+      </div>
+      <div id="bulk-actions" style="display:none;gap:6px;margin-bottom:8px;">
+        <span id="selected-count" style="font-size:13px;color:#666;"></span>
+        <button id="bulk-trash-btn" class="btn btn-danger btn-sm">Trash Selected</button>
+        <button id="bulk-delete-btn" class="btn btn-danger btn-sm">Delete Selected</button>
+      </div>
+      <div id="files-list">
+        <div class="loading" style="padding:12px;">No files found. Sync an account first.</div>
       </div>
     </div>
 
