@@ -17,6 +17,7 @@ model User {
 
   accounts      ConnectedAccount[]
   sessions      Session[]
+  duplicateGroups DuplicateGroup[]
 
   @@map("users")
 }
@@ -42,6 +43,7 @@ model ConnectedAccount {
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   files           FileIndex[]
   storageQuota    StorageQuota?
+  duplicateFiles  DuplicateFile[]
 
   @@unique([userId, providerAccountId])
   @@map("connected_accounts")
@@ -79,6 +81,7 @@ model FileIndex {
   updatedAt          DateTime  @updatedAt
 
   account ConnectedAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  duplicateEntries DuplicateFile[]
 
   @@unique([accountId, providerId])
   @@index([accountId])
@@ -152,6 +155,24 @@ model DuplicateGroup {
   detectedAt DateTime @default(now())
   resolvedAt DateTime?
 
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  duplicateFiles DuplicateFile[]
+
   @@index([userId])
   @@map("duplicate_groups")
+}
+
+model DuplicateFile {
+  id        String @id @default(cuid())
+  groupId   String
+  fileId    String
+  accountId String
+
+  group   DuplicateGroup   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  file    FileIndex        @relation(fields: [fileId], references: [id])
+  account ConnectedAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, fileId])
+  @@index([fileId])
+  @@map("duplicate_files")
 }

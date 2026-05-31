@@ -20,6 +20,8 @@ import folderRoutes from './routes/folders.routes.js';
 import searchRoutes from './routes/search.routes.js';
 import storageRoutes from './routes/storage.routes.js';
 import uploadRoutes from './routes/upload.routes.js';
+import duplicateRoutes from './routes/duplicates.routes.js';
+import analyticsRoutes from './routes/analytics.routes.js';
 
 // Allow BigInt serialization in JSON responses
 (BigInt.prototype as unknown as Record<string, unknown>).toJSON = function () {
@@ -81,6 +83,8 @@ app.use('/api/folders', folderRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/storage', storageRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/duplicates', duplicateRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

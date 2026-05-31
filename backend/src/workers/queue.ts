@@ -33,3 +33,13 @@ export const uploadQueue = new Queue('upload-queue', {
     removeOnFail: 10,
   },
 });
+
+export const duplicatesQueue = new Queue('duplicates-queue', {
+  connection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'fixed', delay: 10000 },
+    removeOnComplete: 50,
+    removeOnFail: 20,
+  },
+});

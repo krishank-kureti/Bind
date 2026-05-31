@@ -39,6 +39,118 @@ function permissionDenied(res: Response) {
   res.status(403).json({ success: false, error: { code: 'PERMISSION_DENIED', message: 'You do not have permission to modify this file' } });
 }
 
+router.post('/batch/trash', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req.user as Express.User).id;
+    const { fileIds } = req.body as { fileIds?: string[] };
+    if (!fileIds || fileIds.length === 0) {
+      res.status(400).json({ success: false, error: { code: 'MISSING_FILEIDS', message: 'fileIds is required' } });
+      return;
+    }
+
+    const results: Array<{ id: string; success: boolean; error?: string }> = [];
+    for (const id of fileIds) {
+      try {
+        const owned = await verifyOwnership(userId, id);
+        if (!owned) { results.push({ id, success: false, error: 'Not found' }); continue; }
+        await driveTrash(owned.account.id, owned.file.providerId);
+        await prisma.fileIndex.update({ where: { id }, data: { isTrashed: true } });
+        results.push({ id, success: true });
+      } catch (err) {
+        results.push({ id, success: false, error: err instanceof Error ? err.message : 'Unknown error' });
+      }
+    }
+
+    res.json({ success: true, data: results });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/batch/restore', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req.user as Express.User).id;
+    const { fileIds } = req.body as { fileIds?: string[] };
+    if (!fileIds || fileIds.length === 0) {
+      res.status(400).json({ success: false, error: { code: 'MISSING_FILEIDS', message: 'fileIds is required' } });
+      return;
+    }
+
+    const results: Array<{ id: string; success: boolean; error?: string }> = [];
+    for (const id of fileIds) {
+      try {
+        const owned = await verifyOwnership(userId, id);
+        if (!owned) { results.push({ id, success: false, error: 'Not found' }); continue; }
+        await driveRestore(owned.account.id, owned.file.providerId);
+        await prisma.fileIndex.update({ where: { id }, data: { isTrashed: false } });
+        results.push({ id, success: true });
+      } catch (err) {
+        results.push({ id, success: false, error: err instanceof Error ? err.message : 'Unknown error' });
+      }
+    }
+
+    res.json({ success: true, data: results });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/batch/delete', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req.user as Express.User).id;
+    const { fileIds } = req.body as { fileIds?: string[] };
+    if (!fileIds || fileIds.length === 0) {
+      res.status(400).json({ success: false, error: { code: 'MISSING_FILEIDS', message: 'fileIds is required' } });
+      return;
+    }
+
+    const results: Array<{ id: string; success: boolean; error?: string }> = [];
+    for (const id of fileIds) {
+      try {
+        const owned = await verifyOwnership(userId, id);
+        if (!owned) { results.push({ id, success: false, error: 'Not found' }); continue; }
+        await permanentlyDeleteFile(owned.account.id, owned.file.providerId);
+        await prisma.fileIndex.delete({ where: { id } });
+        results.push({ id, success: true });
+      } catch (err) {
+        results.push({ id, success: false, error: err instanceof Error ? err.message : 'Unknown error' });
+      }
+    }
+
+    res.json({ success: true, data: results });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/batch/move', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req.user as Express.User).id;
+    const { fileIds, folderId } = req.body as { fileIds?: string[]; folderId?: string };
+    if (!fileIds || fileIds.length === 0 || !folderId) {
+      res.status(400).json({ success: false, error: { code: 'MISSING_PARAMS', message: 'fileIds and folderId are required' } });
+      return;
+    }
+
+    const results: Array<{ id: string; success: boolean; error?: string }> = [];
+    for (const id of fileIds) {
+      try {
+        const owned = await verifyOwnership(userId, id);
+        if (!owned) { results.push({ id, success: false, error: 'Not found' }); continue; }
+        await driveMove(owned.account.id, owned.file.providerId, folderId, owned.file.parentFolderId);
+        await prisma.fileIndex.update({ where: { id }, data: { parentFolderId: folderId } });
+        results.push({ id, success: true });
+      } catch (err) {
+        results.push({ id, success: false, error: err instanceof Error ? err.message : 'Unknown error' });
+      }
+    }
+
+    res.json({ success: true, data: results });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = (req.user as Express.User).id;
@@ -439,118 +551,6 @@ router.post('/:fileId/copy', async (req: Request, res: Response, next: NextFunct
       permissionDenied(res);
       return;
     }
-    next(err);
-  }
-});
-
-router.post('/batch/trash', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const userId = (req.user as Express.User).id;
-    const { fileIds } = req.body as { fileIds?: string[] };
-    if (!fileIds || fileIds.length === 0) {
-      res.status(400).json({ success: false, error: { code: 'MISSING_FILEIDS', message: 'fileIds is required' } });
-      return;
-    }
-
-    const results: Array<{ id: string; success: boolean; error?: string }> = [];
-    for (const id of fileIds) {
-      try {
-        const owned = await verifyOwnership(userId, id);
-        if (!owned) { results.push({ id, success: false, error: 'Not found' }); continue; }
-        await driveTrash(owned.account.id, owned.file.providerId);
-        await prisma.fileIndex.update({ where: { id }, data: { isTrashed: true } });
-        results.push({ id, success: true });
-      } catch (err) {
-        results.push({ id, success: false, error: err instanceof Error ? err.message : 'Unknown error' });
-      }
-    }
-
-    res.json({ success: true, data: results });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post('/batch/restore', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const userId = (req.user as Express.User).id;
-    const { fileIds } = req.body as { fileIds?: string[] };
-    if (!fileIds || fileIds.length === 0) {
-      res.status(400).json({ success: false, error: { code: 'MISSING_FILEIDS', message: 'fileIds is required' } });
-      return;
-    }
-
-    const results: Array<{ id: string; success: boolean; error?: string }> = [];
-    for (const id of fileIds) {
-      try {
-        const owned = await verifyOwnership(userId, id);
-        if (!owned) { results.push({ id, success: false, error: 'Not found' }); continue; }
-        await driveRestore(owned.account.id, owned.file.providerId);
-        await prisma.fileIndex.update({ where: { id }, data: { isTrashed: false } });
-        results.push({ id, success: true });
-      } catch (err) {
-        results.push({ id, success: false, error: err instanceof Error ? err.message : 'Unknown error' });
-      }
-    }
-
-    res.json({ success: true, data: results });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post('/batch/delete', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const userId = (req.user as Express.User).id;
-    const { fileIds } = req.body as { fileIds?: string[] };
-    if (!fileIds || fileIds.length === 0) {
-      res.status(400).json({ success: false, error: { code: 'MISSING_FILEIDS', message: 'fileIds is required' } });
-      return;
-    }
-
-    const results: Array<{ id: string; success: boolean; error?: string }> = [];
-    for (const id of fileIds) {
-      try {
-        const owned = await verifyOwnership(userId, id);
-        if (!owned) { results.push({ id, success: false, error: 'Not found' }); continue; }
-        await permanentlyDeleteFile(owned.account.id, owned.file.providerId);
-        await prisma.fileIndex.delete({ where: { id } });
-        results.push({ id, success: true });
-      } catch (err) {
-        results.push({ id, success: false, error: err instanceof Error ? err.message : 'Unknown error' });
-      }
-    }
-
-    res.json({ success: true, data: results });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post('/batch/move', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const userId = (req.user as Express.User).id;
-    const { fileIds, folderId } = req.body as { fileIds?: string[]; folderId?: string };
-    if (!fileIds || fileIds.length === 0 || !folderId) {
-      res.status(400).json({ success: false, error: { code: 'MISSING_PARAMS', message: 'fileIds and folderId are required' } });
-      return;
-    }
-
-    const results: Array<{ id: string; success: boolean; error?: string }> = [];
-    for (const id of fileIds) {
-      try {
-        const owned = await verifyOwnership(userId, id);
-        if (!owned) { results.push({ id, success: false, error: 'Not found' }); continue; }
-        await driveMove(owned.account.id, owned.file.providerId, folderId, owned.file.parentFolderId);
-        await prisma.fileIndex.update({ where: { id }, data: { parentFolderId: folderId } });
-        results.push({ id, success: true });
-      } catch (err) {
-        results.push({ id, success: false, error: err instanceof Error ? err.message : 'Unknown error' });
-      }
-    }
-
-    res.json({ success: true, data: results });
-  } catch (err) {
     next(err);
   }
 });

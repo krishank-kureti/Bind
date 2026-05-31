@@ -133,6 +133,8 @@ async function loadAuthState() {
 
     refreshAllQuotas();
     loadFiles();
+    loadAnalytics();
+    loadDuplicates();
   } catch (err) {
     document.getElementById('loading-view').classList.add('hidden');
     document.getElementById('unauthenticated-view').classList.remove('hidden');
@@ -477,6 +479,128 @@ async function bulkDelete() {
   }
 }
 
+async function loadAnalytics() {
+  try {
+    const [summaryRes, typesRes] = await Promise.all([
+      fetch('/api/analytics/summary'),
+      fetch('/api/analytics/file-types'),
+    ]);
+    const summaryBody = await summaryRes.json();
+    const typesBody = await typesRes.json();
+
+    if (!summaryBody.success) return;
+
+    const data = summaryBody.data;
+    const summaryEl = document.getElementById('analytics-summary');
+    const typesEl = document.getElementById('analytics-file-types');
+
+    const usedGB = (Number(data.usedStorage) / 1e9).toFixed(2);
+    const totalGB = (Number(data.totalStorage) / 1e9).toFixed(2);
+
+    let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
+    html += '<div><strong>' + data.totalFiles + '</strong> files</div>';
+    html += '<div><strong>' + data.totalFolders + '</strong> folders</div>';
+    html += '<div><strong>' + data.trashedFiles + '</strong> trashed</div>';
+    html += '<div><strong>' + usedGB + ' GB</strong> / ' + totalGB + ' GB used</div>';
+    html += '</div>';
+
+    if (data.accounts.length > 1) {
+      html += '<div style="margin-top:8px;font-size:12px;"><strong>Per account:</strong></div>';
+      data.accounts.forEach(a => {
+        const aUsed = (Number(a.usedBytes) / 1e9).toFixed(2);
+        html += '<div style="font-size:12px;margin-top:4px;">' + a.email + ': ' + a.fileCount + ' files, ' + aUsed + ' GB</div>';
+      });
+    }
+
+    summaryEl.innerHTML = html;
+
+    if (typesBody.success && typesBody.data.length > 0) {
+      let tHtml = '<div style="margin-top:8px;font-size:12px;"><strong>File types:</strong> ';
+      typesBody.data.forEach((t, i) => {
+        const sizeMB = (Number(t.totalSize) / 1e6).toFixed(1);
+        tHtml += t.type + ' (' + t.count + ', ' + sizeMB + ' MB)';
+        if (i < typesBody.data.length - 1) tHtml += ' · ';
+      });
+      tHtml += '</div>';
+      typesEl.innerHTML = tHtml;
+    }
+  } catch {}
+}
+
+async function scanDuplicates() {
+  const btn = document.getElementById('scan-duplicates-btn');
+  const status = document.getElementById('duplicates-status');
+  btn.disabled = true;
+  status.textContent = 'Scanning...';
+  try {
+    const r = await fetch('/api/duplicates/scan', { method: 'POST' });
+    const body = await r.json();
+    if (!body.success) throw new Error(body.error?.message || 'Scan failed');
+    status.textContent = 'Scan queued. Checking results...';
+    setTimeout(loadDuplicates, 3000);
+  } catch (err) {
+    status.textContent = 'Error: ' + err.message;
+    btn.disabled = false;
+  }
+}
+
+async function loadDuplicates() {
+  const list = document.getElementById('duplicates-list');
+  const status = document.getElementById('duplicates-status');
+  const btn = document.getElementById('scan-duplicates-btn');
+
+  try {
+    const r = await fetch('/api/duplicates');
+    const body = await r.json();
+    if (!body.success) return;
+
+    const groups = body.data;
+    if (groups.length === 0) {
+      list.innerHTML = '<div class="loading" style="padding:12px;">No duplicates found.</div>';
+      status.textContent = '';
+      btn.disabled = false;
+      return;
+    }
+
+    status.textContent = groups.length + ' duplicate group(s) found';
+    btn.disabled = false;
+    list.innerHTML = '';
+
+    groups.forEach(group => {
+      const wasteMB = (Number(group.totalWaste) / 1e6).toFixed(1);
+      const sizeKB = (Number(group.fileSize) / 1024).toFixed(0);
+
+      const card = document.createElement('div');
+      card.style.cssText = 'border:1px solid #eee;border-radius:6px;padding:10px;margin-bottom:8px;font-size:13px;';
+
+      card.innerHTML = '<div style="display:flex;justify-content:space-between;margin-bottom:6px;">' +
+        '<strong>' + group.fileCount + ' files</strong> ' +
+        '<span style="color:#ea4335;">~' + wasteMB + ' MB waste</span>' +
+        '</div>' +
+        '<div style="font-size:11px;color:#888;margin-bottom:4px;">Size: ' + sizeKB + ' KB · Checksum: ' + group.checksum.slice(0, 12) + '…</div>';
+
+      const fileList = document.createElement('div');
+      fileList.style.cssText = 'font-size:12px;';
+
+      group.duplicateFiles.forEach((df) => {
+        const color = getAccountColor(df.account.email);
+        const label = (df.account.displayName || df.account.email)[0].toUpperCase();
+        const fileEl = document.createElement('div');
+        fileEl.style.cssText = 'display:flex;align-items:center;gap:6px;padding:4px 0;';
+        fileEl.innerHTML = '<span class="account-chip" style="background:' + color + ';width:14px;height:14px;font-size:7px;">' + label + '</span>' +
+          '<span class="account-tag" style="max-width:80px;">' + df.account.email + '</span>' +
+          '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + df.file.name + '</span>';
+        card.appendChild(fileEl);
+      });
+
+      list.appendChild(card);
+    });
+  } catch {
+    list.innerHTML = '<div class="loading" style="padding:12px;">Failed to load duplicates.</div>';
+    btn.disabled = false;
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('refresh-quota-btn').addEventListener('click', refreshAllQuotas);
   document.getElementById('upload-btn').addEventListener('click', uploadFile);
@@ -491,6 +615,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('bulk-trash-btn').addEventListener('click', bulkTrash);
   document.getElementById('bulk-delete-btn').addEventListener('click', bulkDelete);
+  document.getElementById('scan-duplicates-btn').addEventListener('click', scanDuplicates);
   document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.addEventListener('click', () => setFilter(btn.dataset.filter));
   });
