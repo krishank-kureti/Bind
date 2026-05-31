@@ -27,6 +27,7 @@ export async function indexAccount(accountId: string): Promise<number> {
         thumbnailLink: file.thumbnailLink ?? null,
         iconLink: file.iconLink ?? null,
         starred: file.starred ?? false,
+        isOwned: file.owners?.some((o) => o.me === true) ?? true,
         md5Checksum: file.md5Checksum ?? null,
       };
 

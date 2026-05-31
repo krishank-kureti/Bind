@@ -246,6 +246,8 @@ async function loadFiles(query, append) {
     let url = '/api/files?limit=50';
     if (query) url += '&query=' + encodeURIComponent(query);
     if (currentFilter === 'starred') url += '&starred=true';
+    else if (currentFilter === 'owned') url += '&owned=true';
+    else if (currentFilter === 'shared') url += '&owned=false';
     if (append && pageCursor) url += '&cursor=' + pageCursor;
     const res = await fetch(url);
     const body = await res.json();

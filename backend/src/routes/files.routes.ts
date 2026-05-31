@@ -165,6 +165,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       cursor,
       sortBy,
       sortDir,
+      owned,
     } = req.query as Record<string, string | undefined>;
 
     const limit = Math.min(Math.max(Number(limitStr) || 50, 1), 200);
@@ -188,6 +189,8 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     if (mimeType) where.mimeType = mimeType;
     if (folderId) where.parentFolderId = folderId;
     if (starred === 'true') where.starred = true;
+    if (owned === 'true') where.isOwned = true;
+    if (owned === 'false') where.isOwned = false;
     if (query) where.name = { contains: query, mode: 'insensitive' };
 
     const orderBy: Prisma.FileIndexOrderByWithRelationInput = {};

@@ -74,6 +74,7 @@ model FileIndex {
   iconLink           String?
   thumbnailLink      String?
   starred            Boolean   @default(false)
+  isOwned            Boolean   @default(true)
   md5Checksum        String?
   sha256Checksum     String?
   searchVector       Unsupported("tsvector")?
