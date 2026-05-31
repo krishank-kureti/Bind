@@ -680,15 +680,17 @@ async function loadDuplicates() {
     groups.forEach(group => {
       const wasteMB = (Number(group.totalWaste) / 1e6).toFixed(1);
       const sizeKB = (Number(group.fileSize) / 1024).toFixed(0);
+      const origName = group.duplicateFiles.length > 0 ? group.duplicateFiles[0].file.name : '';
+      const resolved = !!group.resolvedAt;
 
       const card = document.createElement('div');
       card.style.cssText = 'border:1px solid #eee;border-radius:6px;padding:10px;margin-bottom:8px;font-size:13px;';
 
-      card.innerHTML = '<div style="display:flex;justify-content:space-between;margin-bottom:6px;">' +
-        '<strong>' + group.fileCount + ' files</strong> ' +
-        '<span style="color:#ea4335;">~' + wasteMB + ' MB waste</span>' +
+      card.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+        '<div><strong>' + group.fileCount + ' × ' + escapeHtml(origName) + '</strong></div> ' +
+        '<span style="color:#ea4335;white-space:nowrap;">~' + wasteMB + ' MB waste</span>' +
         '</div>' +
-        '<div style="font-size:11px;color:#888;margin-bottom:4px;">Size: ' + sizeKB + ' KB · Checksum: ' + group.checksum.slice(0, 12) + '…</div>';
+        '<div style="font-size:11px;color:#888;margin-bottom:4px;">Each: ' + sizeKB + ' KB</div>';
 
       const fileList = document.createElement('div');
       fileList.style.cssText = 'font-size:12px;';
@@ -696,13 +698,47 @@ async function loadDuplicates() {
       group.duplicateFiles.forEach((df) => {
         const color = getAccountColor(df.account.email);
         const label = (df.account.displayName || df.account.email)[0].toUpperCase();
+        const ownedLabel = df.file.isOwned ? '' : ' 🔗';
         const fileEl = document.createElement('div');
         fileEl.style.cssText = 'display:flex;align-items:center;gap:6px;padding:4px 0;';
         fileEl.innerHTML = '<span class="account-chip" style="background:' + color + ';width:14px;height:14px;font-size:7px;">' + label + '</span>' +
           '<span class="account-tag" style="max-width:80px;">' + df.account.email + '</span>' +
-          '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + df.file.name + '</span>';
+          '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(df.file.name) + ownedLabel + '</span>';
         card.appendChild(fileEl);
       });
+
+      if (!resolved) {
+        const resolveBtn = document.createElement('button');
+        resolveBtn.className = 'btn btn-danger btn-sm';
+        resolveBtn.textContent = 'Remove All Duplicates (keep 1)';
+        resolveBtn.style.cssText = 'margin-top:6px;';
+        resolveBtn.addEventListener('click', async () => {
+          if (!confirm('Remove all duplicates of "' + origName + '"? Kept files will remain; all other copies will be deleted (owned) or trashed (shared).')) return;
+          resolveBtn.disabled = true;
+          resolveBtn.textContent = 'Removing...';
+          try {
+            const keepId = group.duplicateFiles[0].file.id;
+            const r = await fetch('/api/duplicates/' + group.id + '/resolve', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ keepFileId: keepId }),
+            });
+            const body = await r.json();
+            if (!body.success) throw new Error(body.error?.message || 'Failed to resolve');
+            loadDuplicates();
+          } catch (err) {
+            alert(err.message);
+            resolveBtn.disabled = false;
+            resolveBtn.textContent = 'Remove All Duplicates (keep 1)';
+          }
+        });
+        card.appendChild(resolveBtn);
+      } else {
+        const doneLabel = document.createElement('span');
+        doneLabel.style.cssText = 'display:inline-block;margin-top:6px;font-size:12px;color:#34a853;font-weight:500;';
+        doneLabel.textContent = '✓ Resolved';
+        card.appendChild(doneLabel);
+      }
 
       list.appendChild(card);
     });
