@@ -187,7 +187,8 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     };
 
     if (mimeType) where.mimeType = mimeType;
-    if (folderId) where.parentFolderId = folderId;
+    if (folderId === 'root') where.parentFolderId = null;
+    else if (folderId) where.parentFolderId = folderId;
     if (starred === 'true') where.starred = true;
     if (owned === 'true') where.isOwned = true;
     if (owned === 'false') where.isOwned = false;

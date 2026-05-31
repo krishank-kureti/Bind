@@ -18,6 +18,8 @@ let pageCursor = null;
 let hasMorePages = false;
 let currentQuery = '';
 let currentFilter = '';
+let currentFolderId = null;
+let folderPath = [];
 
 async function triggerSync(accountId, btn) {
   btn.disabled = true;
@@ -236,6 +238,88 @@ function pollUploadJob(jobId, statusEl) {
   setTimeout(poll, 2000);
 }
 
+function navigateToFolder(folderId, folderName) {
+  folderPath.push({ id: folderId, name: folderName });
+  currentFolderId = folderId;
+  pageCursor = null;
+  hasMorePages = false;
+  selectedFiles = new Set();
+  renderBreadcrumb();
+  loadFiles(document.getElementById('search-query').value);
+}
+
+function navigateToFolderId(folderId) {
+  const idx = folderPath.findIndex(p => p.id === folderId);
+  if (idx >= 0) {
+    folderPath = folderPath.slice(0, idx + 1);
+    currentFolderId = folderId;
+  } else {
+    currentFolderId = folderId;
+    folderPath = [];
+  }
+  pageCursor = null;
+  hasMorePages = false;
+  selectedFiles = new Set();
+  renderBreadcrumb();
+  loadFiles(document.getElementById('search-query').value);
+}
+
+function navigateUp() {
+  if (folderPath.length === 0) return;
+  folderPath.pop();
+  currentFolderId = folderPath.length > 0 ? folderPath[folderPath.length - 1].id : null;
+  pageCursor = null;
+  hasMorePages = false;
+  selectedFiles = new Set();
+  renderBreadcrumb();
+  loadFiles(document.getElementById('search-query').value);
+}
+
+function navigateRoot() {
+  folderPath = [];
+  currentFolderId = null;
+  pageCursor = null;
+  hasMorePages = false;
+  selectedFiles = new Set();
+  renderBreadcrumb();
+  loadFiles(document.getElementById('search-query').value);
+}
+
+function renderBreadcrumb() {
+  const bar = document.getElementById('breadcrumb-bar');
+  if (folderPath.length === 0) {
+    bar.innerHTML = '';
+    return;
+  }
+  let html = '<a href="#" class="breadcrumb-root" style="color:#4285f4;text-decoration:none;">Root</a>';
+  folderPath.forEach((p, i) => {
+    html += ' <span style="color:#999;">›</span> ';
+    if (i === folderPath.length - 1) {
+      html += '<span style="font-weight:500;">' + escapeHtml(p.name) + '</span>';
+    } else {
+      html += '<a href="#" class="breadcrumb-link" data-folder-id="' + p.id + '" style="color:#4285f4;text-decoration:none;">' + escapeHtml(p.name) + '</a>';
+    }
+  });
+  bar.innerHTML = html;
+
+  bar.querySelector('.breadcrumb-root')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    navigateRoot();
+  });
+  bar.querySelectorAll('.breadcrumb-link').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      navigateToFolderId(el.dataset.folderId);
+    });
+  });
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
 async function loadFiles(query, append) {
   const list = document.getElementById('files-list');
   if (!append) list.innerHTML = '<div class="loading">Loading files...</div>';
@@ -244,6 +328,7 @@ async function loadFiles(query, append) {
 
   try {
     let url = '/api/files?limit=50';
+    if (currentFolderId) url += '&folderId=' + encodeURIComponent(currentFolderId);
     if (query) url += '&query=' + encodeURIComponent(query);
     if (currentFilter === 'starred') url += '&starred=true';
     else if (currentFilter === 'owned') url += '&owned=true';
@@ -273,27 +358,37 @@ function renderFiles() {
   const bulkActions = document.getElementById('bulk-actions');
 
   if (currentFilesData.length === 0) {
-    list.innerHTML = '<div class="loading">No files found. Sync an account first.</div>';
+    list.innerHTML = '<div class="loading">No files found in this folder.</div>';
     bulkActions.style.display = 'none';
     return;
   }
 
   list.innerHTML = '';
-  currentFilesData.forEach(file => {
+
+  const sorted = [...currentFilesData].sort((a, b) => {
+    if (a.isFolder && !b.isFolder) return -1;
+    if (!a.isFolder && b.isFolder) return 1;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+  sorted.forEach(file => {
     const div = document.createElement('div');
     div.className = 'file-item';
 
     const color = getAccountColor(file.account.email);
     const label = (file.account.displayName || file.account.email)[0].toUpperCase();
     const isChecked = selectedFiles.has(file.id);
+    const isFolder = file.isFolder;
+    const icon = isFolder ? '📁' : (file.starred ? '⭐ ' : '');
+    const sizeText = file.size ? (Number(file.size) / 1024).toFixed(0) + ' KB' : (isFolder ? '' : '');
 
     div.innerHTML = `
       <input type="checkbox" class="file-checkbox" data-id="${file.id}" ${isChecked ? 'checked' : ''}>
       <span class="account-chip" style="background:${color}" title="${file.account.email}">${label}</span>
       <span class="account-tag" title="${file.account.email}">${file.account.email}</span>
-      <span class="file-name" title="${file.name}">${file.starred ? '⭐ ' : ''}${file.name}</span>
-      <span class="file-meta">${file.size ? (Number(file.size) / 1024).toFixed(0) + ' KB' : ''}</span>
-      <span class="menu-container">
+      <span class="file-name ${isFolder ? 'folder-name' : ''}" title="${file.name}" style="${isFolder ? 'font-weight:600;cursor:pointer;' : ''}">${icon}${file.name}</span>
+      <span class="file-meta">${sizeText}</span>
+      ${isFolder ? '' : `<span class="menu-container">
         <button class="menu-trigger">···</button>
         <div class="menu-dropdown">
           <button class="menu-item rename-btn">Rename</button>
@@ -303,102 +398,116 @@ function renderFiles() {
           <button class="menu-item copy-btn">Copy</button>
           <button class="menu-item danger delete-btn">Delete</button>
         </div>
-      </span>
+      </span>`}
     `;
 
-    const checkbox = div.querySelector('.file-checkbox');
-    checkbox.addEventListener('change', () => {
-      if (checkbox.checked) selectedFiles.add(file.id);
-      else selectedFiles.delete(file.id);
-      updateBulkActions();
-    });
+    const fileNameSpan = div.querySelector('.file-name');
 
-    const trigger = div.querySelector('.menu-trigger');
-    const dropdown = div.querySelector('.menu-dropdown');
-    trigger.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const wasOpen = dropdown.classList.contains('open');
-      closeAllMenus();
-      if (!wasOpen) dropdown.classList.add('open');
-    });
+    if (isFolder) {
+      fileNameSpan.addEventListener('click', () => {
+        navigateToFolder(file.id, file.name);
+      });
+    }
 
-    dropdown.querySelector('.rename-btn').addEventListener('click', async () => {
-      closeAllMenus();
-      const name = prompt('New name:', file.name);
-      if (!name || name === file.name) return;
-      try {
-        const r = await fetch('/api/files/' + file.id + '/rename', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name }),
-        });
-        const body = await r.json();
-        if (!r.ok) throw new Error(body?.error?.message || 'Rename failed');
-        loadFiles(document.getElementById('search-query').value);
-      } catch (err) { alert(err.message); }
-    });
+    if (!isFolder) {
+      const checkbox = div.querySelector('.file-checkbox');
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) selectedFiles.add(file.id);
+        else selectedFiles.delete(file.id);
+        updateBulkActions();
+      });
 
-    dropdown.querySelector('.move-btn').addEventListener('click', async () => {
-      closeAllMenus();
-      const folderId = prompt('Target folder ID:');
-      if (!folderId) return;
-      try {
-        const r = await fetch('/api/files/' + file.id + '/move', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ folderId }),
-        });
-        const body = await r.json();
-        if (!r.ok) throw new Error(body?.error?.message || 'Move failed');
-        loadFiles(document.getElementById('search-query').value);
-      } catch (err) { alert(err.message); }
-    });
+      const trigger = div.querySelector('.menu-trigger');
+      const dropdown = div.querySelector('.menu-dropdown');
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const wasOpen = dropdown.classList.contains('open');
+        closeAllMenus();
+        if (!wasOpen) dropdown.classList.add('open');
+      });
 
-    dropdown.querySelector('.star-btn').addEventListener('click', async () => {
-      closeAllMenus();
-      try {
-        const r = await fetch('/api/files/' + file.id + '/star', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ starred: !file.starred }),
-        });
-        const body = await r.json();
-        if (!r.ok) throw new Error(body?.error?.message || 'Star failed');
-        loadFiles(document.getElementById('search-query').value);
-      } catch (err) { alert(err.message); }
-    });
+      const actionHandlers = {
+        rename: async () => {
+          const name = prompt('New name:', file.name);
+          if (!name || name === file.name) return;
+          const r = await fetch('/api/files/' + file.id + '/rename', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name }),
+          });
+          const b = await r.json();
+          if (!r.ok) throw new Error(b?.error?.message || 'Rename failed');
+          loadFiles(document.getElementById('search-query').value);
+        },
+        move: async () => {
+          const folderId = prompt('Target folder ID:');
+          if (!folderId) return;
+          const r = await fetch('/api/files/' + file.id + '/move', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folderId }),
+          });
+          const b = await r.json();
+          if (!r.ok) throw new Error(b?.error?.message || 'Move failed');
+          loadFiles(document.getElementById('search-query').value);
+        },
+        star: async () => {
+          const r = await fetch('/api/files/' + file.id + '/star', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ starred: !file.starred }),
+          });
+          const b = await r.json();
+          if (!r.ok) throw new Error(b?.error?.message || 'Star failed');
+          loadFiles(document.getElementById('search-query').value);
+        },
+        trash: async () => {
+          if (!confirm('Trash "' + file.name + '"?')) return;
+          const r = await fetch('/api/files/' + file.id + '/trash', { method: 'POST' });
+          const b = await r.json();
+          if (!r.ok) throw new Error(b?.error?.message || 'Trash failed');
+          loadFiles(document.getElementById('search-query').value);
+        },
+        copy: async () => {
+          const r = await fetch('/api/files/' + file.id + '/copy', { method: 'POST' });
+          const b = await r.json();
+          if (!r.ok) throw new Error(b?.error?.message || 'Copy failed');
+          loadFiles(document.getElementById('search-query').value);
+        },
+        delete: async () => {
+          if (!confirm('Permanently delete "' + file.name + '"? This cannot be undone.')) return;
+          const r = await fetch('/api/files/' + file.id, { method: 'DELETE' });
+          const b = await r.json();
+          if (!r.ok) throw new Error(b?.error?.message || 'Delete failed');
+          loadFiles(document.getElementById('search-query').value);
+        },
+      };
 
-    dropdown.querySelector('.trash-btn').addEventListener('click', async () => {
-      closeAllMenus();
-      if (!confirm('Trash "' + file.name + '"?')) return;
-      try {
-        const r = await fetch('/api/files/' + file.id + '/trash', { method: 'POST' });
-        const body = await r.json();
-        if (!r.ok) throw new Error(body?.error?.message || 'Trash failed');
-        loadFiles(document.getElementById('search-query').value);
-      } catch (err) { alert(err.message); }
-    });
-
-    dropdown.querySelector('.copy-btn').addEventListener('click', async () => {
-      closeAllMenus();
-      try {
-        const r = await fetch('/api/files/' + file.id + '/copy', { method: 'POST' });
-        const body = await r.json();
-        if (!r.ok) throw new Error(body?.error?.message || 'Copy failed');
-        loadFiles(document.getElementById('search-query').value);
-      } catch (err) { alert(err.message); }
-    });
-
-    dropdown.querySelector('.delete-btn').addEventListener('click', async () => {
-      closeAllMenus();
-      if (!confirm('Permanently delete "' + file.name + '"? This cannot be undone.')) return;
-      try {
-        const r = await fetch('/api/files/' + file.id, { method: 'DELETE' });
-        const body = await r.json();
-        if (!r.ok) throw new Error(body?.error?.message || 'Delete failed');
-        loadFiles(document.getElementById('search-query').value);
-      } catch (err) { alert(err.message); }
-    });
+      dropdown.querySelector('.rename-btn').addEventListener('click', async () => {
+        closeAllMenus();
+        try { await actionHandlers.rename(); } catch (err) { alert(err.message); }
+      });
+      dropdown.querySelector('.move-btn').addEventListener('click', async () => {
+        closeAllMenus();
+        try { await actionHandlers.move(); } catch (err) { alert(err.message); }
+      });
+      dropdown.querySelector('.star-btn').addEventListener('click', async () => {
+        closeAllMenus();
+        try { await actionHandlers.star(); } catch (err) { alert(err.message); }
+      });
+      dropdown.querySelector('.trash-btn').addEventListener('click', async () => {
+        closeAllMenus();
+        try { await actionHandlers.trash(); } catch (err) { alert(err.message); }
+      });
+      dropdown.querySelector('.copy-btn').addEventListener('click', async () => {
+        closeAllMenus();
+        try { await actionHandlers.copy(); } catch (err) { alert(err.message); }
+      });
+      dropdown.querySelector('.delete-btn').addEventListener('click', async () => {
+        closeAllMenus();
+        try { await actionHandlers.delete(); } catch (err) { alert(err.message); }
+      });
+    }
 
     list.appendChild(div);
   });
