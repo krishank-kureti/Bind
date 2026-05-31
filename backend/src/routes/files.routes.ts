@@ -208,7 +208,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       where,
       take: limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      orderBy: [orderBy, { id: 'desc' }],
+      orderBy: [{ isFolder: 'desc' as const }, orderBy, { id: 'desc' as const }],
       include: { account: accountSelect },
     });
 

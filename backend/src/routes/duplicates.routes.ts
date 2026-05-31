@@ -43,7 +43,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const userId = (req.user as Express.User).id;
 
     const groups = await prisma.duplicateGroup.findMany({
-      where: { userId },
+      where: { userId, resolvedAt: null },
       orderBy: { totalWaste: 'desc' },
       include: {
         duplicateFiles: {
@@ -99,6 +99,17 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+function isFileNotFound(err: unknown): boolean {
+  if (err && typeof err === 'object') {
+    if ('code' in err && err.code === 404) return true;
+    if ('response' in err && err.response && typeof err.response === 'object') {
+      const r = err.response as Record<string, unknown>;
+      if (r.status === 404) return true;
+    }
+  }
+  return false;
+}
+
 router.post('/:id/resolve', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = (req.user as Express.User).id;
@@ -138,16 +149,26 @@ router.post('/:id/resolve', async (req: Request, res: Response, next: NextFuncti
     }
 
     const results: Array<{ fileId: string; action: string; success: boolean; error?: string }> = [];
+    let allSucceeded = true;
 
     for (const df of toRemove) {
       try {
         const fileIndexRecord = df.file;
+
+        await prisma.duplicateFile.deleteMany({
+          where: { groupId, fileId: fileIndexRecord.id },
+        });
+
         if (fileIndexRecord.isOwned) {
-          await permanentlyDeleteFile(fileIndexRecord.accountId, fileIndexRecord.providerId);
+          await permanentlyDeleteFile(fileIndexRecord.accountId, fileIndexRecord.providerId).catch((driveErr: unknown) => {
+            if (!isFileNotFound(driveErr)) throw driveErr;
+          });
           await prisma.fileIndex.delete({ where: { id: fileIndexRecord.id } });
           results.push({ fileId: fileIndexRecord.id, action: 'permanently_deleted', success: true });
         } else {
-          await trashFile(fileIndexRecord.accountId, fileIndexRecord.providerId);
+          await trashFile(fileIndexRecord.accountId, fileIndexRecord.providerId).catch((driveErr: unknown) => {
+            if (!isFileNotFound(driveErr)) throw driveErr;
+          });
           await prisma.fileIndex.update({
             where: { id: fileIndexRecord.id },
             data: { isTrashed: true },
@@ -158,7 +179,22 @@ router.post('/:id/resolve', async (req: Request, res: Response, next: NextFuncti
         const msg = err instanceof Error ? err.message : 'Unknown error';
         logger.warn({ fileId: df.fileId, err }, 'Failed to remove duplicate file');
         results.push({ fileId: df.fileId, action: 'failed', success: false, error: msg });
+        allSucceeded = false;
       }
+    }
+
+    if (!allSucceeded) {
+      const failedCount = results.filter((r) => !r.success).length;
+      res.json({
+        success: true,
+        data: {
+          message: `${results.length - failedCount} removed, ${failedCount} failed`,
+          results,
+          partial: true,
+          hint: 'Some files could not be removed. The duplicate group was preserved for retry.',
+        },
+      });
+      return;
     }
 
     await prisma.duplicateFile.deleteMany({
@@ -170,7 +206,7 @@ router.post('/:id/resolve', async (req: Request, res: Response, next: NextFuncti
       data: { resolvedAt: new Date(), fileCount: keepFileId ? 1 : 1 },
     });
 
-    res.json({ success: true, data: { message: `Processed ${results.length} duplicate files`, results } });
+    res.json({ success: true, data: { message: `Removed ${results.length} duplicate files`, results, partial: false } });
   } catch (err) {
     next(err);
   }

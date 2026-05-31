@@ -244,8 +244,14 @@ function navigateToFolder(folderId, folderName) {
   pageCursor = null;
   hasMorePages = false;
   selectedFiles = new Set();
+  currentQuery = '';
+  currentFilter = '';
+  document.getElementById('search-query').value = '';
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.filter === '');
+  });
   renderBreadcrumb();
-  loadFiles(document.getElementById('search-query').value);
+  loadFiles('');
 }
 
 function navigateToFolderId(folderId) {
@@ -358,20 +364,18 @@ function renderFiles() {
   const bulkActions = document.getElementById('bulk-actions');
 
   if (currentFilesData.length === 0) {
-    list.innerHTML = '<div class="loading">No files found in this folder.</div>';
+    if (currentQuery) {
+      list.innerHTML = '<div class="loading">No results found for "' + escapeHtml(currentQuery) + '". If you aren\'t seeing any results first clear the search bar.</div>';
+    } else {
+      list.innerHTML = '<div class="loading">No files found in this folder.</div>';
+    }
     bulkActions.style.display = 'none';
     return;
   }
 
   list.innerHTML = '';
 
-  const sorted = [...currentFilesData].sort((a, b) => {
-    if (a.isFolder && !b.isFolder) return -1;
-    if (!a.isFolder && b.isFolder) return 1;
-    return (a.name || '').localeCompare(b.name || '');
-  });
-
-  sorted.forEach(file => {
+  currentFilesData.forEach(file => {
     const div = document.createElement('div');
     div.className = 'file-item';
 
@@ -687,7 +691,7 @@ async function loadDuplicates() {
       card.style.cssText = 'border:1px solid #eee;border-radius:6px;padding:10px;margin-bottom:8px;font-size:13px;';
 
       card.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
-        '<div><strong>' + group.fileCount + ' × ' + escapeHtml(origName) + '</strong></div> ' +
+        '<div><strong>' + group.fileCount + ' × ' + escapeHtml(origName) + '</strong> <span style="font-size:10px;color:#888;font-weight:400;">' + (group.checksum && group.checksum.startsWith('name:') ? '📝 matched by name' : '🔍 matched by content') + '</span></div> ' +
         '<span style="color:#ea4335;white-space:nowrap;">~' + wasteMB + ' MB waste</span>' +
         '</div>' +
         '<div style="font-size:11px;color:#888;margin-bottom:4px;">Each: ' + sizeKB + ' KB</div>';
@@ -725,7 +729,15 @@ async function loadDuplicates() {
             });
             const body = await r.json();
             if (!body.success) throw new Error(body.error?.message || 'Failed to resolve');
-            loadDuplicates();
+
+            if (body.data.partial) {
+              const failed = body.data.results.filter(r => !r.success);
+              const failedMsgs = failed.map(f => '  • ' + f.error).join('\n');
+              alert('Some files could not be removed:\n' + failedMsgs + '\n\nThe group was not resolved. Try re-syncing the account first.');
+              loadDuplicates();
+            } else {
+              loadDuplicates();
+            }
           } catch (err) {
             alert(err.message);
             resolveBtn.disabled = false;
