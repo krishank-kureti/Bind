@@ -59,6 +59,9 @@
   .menu-item { display:block; width:100%; text-align:left; padding:8px 14px; font-size:12px; border:none; background:none; cursor:pointer; color:#333; }
   .menu-item:hover { background:#f5f5f5; }
   .menu-item.danger { color:#ea4335; }
+  .filter-btn { padding:4px 12px; font-size:12px; border:1px solid #ddd; border-radius:14px; background:#fff; cursor:pointer; color:#666; }
+  .filter-btn:hover { background:#f0f0f0; }
+  .filter-btn.active { background:#4285f4; color:#fff; border-color:#4285f4; }
 </style>
 </head>
 <body>
@@ -114,6 +117,10 @@
     <div class="card">
       <h2>File Browser</h2>
       <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
+        <div id="filter-bar" style="display:flex;gap:4px;width:100%;margin-bottom:4px;">
+          <button class="filter-btn active" data-filter="">All Files</button>
+          <button class="filter-btn" data-filter="starred">⭐ Starred</button>
+        </div>
         <input type="text" id="search-query" placeholder="Search files..." style="flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
         <button id="search-btn" class="btn btn-outline btn-sm">Search</button>
         <button id="refresh-files-btn" class="btn btn-outline btn-sm">Refresh</button>

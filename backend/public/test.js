@@ -17,6 +17,7 @@ let currentFilesData = [];
 let pageCursor = null;
 let hasMorePages = false;
 let currentQuery = '';
+let currentFilter = '';
 
 async function triggerSync(accountId, btn) {
   btn.disabled = true;
@@ -242,6 +243,7 @@ async function loadFiles(query, append) {
   try {
     let url = '/api/files?limit=50';
     if (query) url += '&query=' + encodeURIComponent(query);
+    if (currentFilter === 'starred') url += '&starred=true';
     if (append && pageCursor) url += '&cursor=' + pageCursor;
     const res = await fetch(url);
     const body = await res.json();
@@ -285,7 +287,7 @@ function renderFiles() {
       <input type="checkbox" class="file-checkbox" data-id="${file.id}" ${isChecked ? 'checked' : ''}>
       <span class="account-chip" style="background:${color}" title="${file.account.email}">${label}</span>
       <span class="account-tag" title="${file.account.email}">${file.account.email}</span>
-      <span class="file-name" title="${file.name}">${file.name}</span>
+      <span class="file-name" title="${file.name}">${file.starred ? '⭐ ' : ''}${file.name}</span>
       <span class="file-meta">${file.size ? (Number(file.size) / 1024).toFixed(0) + ' KB' : ''}</span>
       <span class="menu-container">
         <button class="menu-trigger">···</button>
@@ -411,6 +413,16 @@ function renderFiles() {
   updateBulkActions();
 }
 
+function setFilter(filter) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.filter === filter);
+  });
+  pageCursor = null;
+  hasMorePages = false;
+  loadFiles(document.getElementById('search-query').value);
+}
+
 function loadMore() {
   loadFiles(currentQuery, true);
 }
@@ -479,6 +491,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('bulk-trash-btn').addEventListener('click', bulkTrash);
   document.getElementById('bulk-delete-btn').addEventListener('click', bulkDelete);
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => setFilter(btn.dataset.filter));
+  });
 });
 
 loadAuthState();
