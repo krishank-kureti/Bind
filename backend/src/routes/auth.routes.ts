@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import passport from 'passport';
 import { getUserWithAccounts } from '../services/auth.service.js';
-import { requireAuth } from '../middleware/auth.middleware.js';
+import { env } from '../config/env.js';
 
 const router = Router();
 
@@ -17,8 +17,8 @@ router.get('/google', passport.authenticate('google', {
 }));
 
 router.get('/google/callback', passport.authenticate('google', {
-  successRedirect: '/test.html',
-  failureRedirect: '/test.html?error=auth_failed',
+  successRedirect: `${env.FRONTEND_URL}/`,
+  failureRedirect: `${env.FRONTEND_URL}/?error=auth_failed`,
 }));
 
 router.post('/logout', (req, res, next) => {
@@ -27,7 +27,7 @@ router.post('/logout', (req, res, next) => {
       next(err);
       return;
     }
-    res.redirect('/test.html');
+    res.redirect(env.FRONTEND_URL);
   });
 });
 
