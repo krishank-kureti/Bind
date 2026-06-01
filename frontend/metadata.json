@@ -1,0 +1,6 @@
+{
+  "name": "BIND",
+  "description": "Unified CloudVault multi-account storage intelligence dashboard with automated routing and duplicates detection recommendations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
