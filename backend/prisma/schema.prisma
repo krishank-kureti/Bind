@@ -90,6 +90,11 @@ model FileIndex {
   @@index([mimeType])
   @@index([parentFolderId])
   @@index([md5Checksum])
+  @@index([isTrashed])
+  @@index([starred])
+  @@index([isOwned])
+  @@index([isFolder])
+  @@index([accountId, isTrashed, parentFolderId])
   @@map("file_index")
 }
 

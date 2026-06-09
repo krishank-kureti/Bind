@@ -1,8 +1,11 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { prisma } from '../config/prisma.js';
+import { redis } from '../config/redis.js';
+import { createHash } from 'node:crypto';
 import {
   downloadFile,
+  uploadFile as driveUpload,
   renameFile as driveRename,
   moveFile as driveMove,
   toggleStarFile,
@@ -53,8 +56,13 @@ router.post('/batch/trash', async (req: Request, res: Response, next: NextFuncti
       try {
         const owned = await verifyOwnership(userId, id);
         if (!owned) { results.push({ id, success: false, error: 'Not found' }); continue; }
-        await driveTrash(owned.account.id, owned.file.providerId);
-        await prisma.fileIndex.update({ where: { id }, data: { isTrashed: true } });
+        if (owned.file.isOwned) {
+          await driveTrash(owned.account.id, owned.file.providerId);
+          await prisma.fileIndex.update({ where: { id }, data: { isTrashed: true } });
+        } else {
+          await permanentlyDeleteFile(owned.account.id, owned.file.providerId);
+          await prisma.fileIndex.delete({ where: { id } });
+        }
         results.push({ id, success: true });
       } catch (err) {
         results.push({ id, success: false, error: err instanceof Error ? err.message : 'Unknown error' });
@@ -157,6 +165,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const {
       accountId,
       mimeType,
+      category,
       folderId,
       query,
       starred,
@@ -165,10 +174,18 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       cursor,
       sortBy,
       sortDir,
-      owned,
     } = req.query as Record<string, string | undefined>;
 
-    const limit = Math.min(Math.max(Number(limitStr) || 50, 1), 200);
+    const limit = Math.min(Math.max(Number(limitStr) || 50, 1), 500);
+
+    if (!cursor) {
+      const cacheKey = `files:${userId}:${createHash('sha256').update(JSON.stringify(req.query)).digest('hex').slice(0, 32)}`;
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        res.json(JSON.parse(cached));
+        return;
+      }
+    }
 
     const accounts = await prisma.connectedAccount.findMany({
       where: { userId, isActive: true, ...(accountId ? { id: accountId } : {}) },
@@ -184,25 +201,51 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const where: Prisma.FileIndexWhereInput = {
       accountId: { in: accountIds },
       isTrashed: trashed === 'true' ? true : trashed === 'all' ? undefined : false,
+      isOwned: true,
     };
 
-    if (mimeType) where.mimeType = mimeType;
+    if (mimeType) {
+      if (mimeType.endsWith('/*')) {
+        where.mimeType = { startsWith: mimeType.slice(0, -2) } as unknown as string;
+      } else {
+        where.mimeType = mimeType;
+      }
+    }
     if (folderId === 'root') where.parentFolderId = null;
     else if (folderId) {
       const folder = await prisma.fileIndex.findUnique({ where: { id: folderId } });
       where.parentFolderId = folder?.providerId ?? folderId;
     }
     if (starred === 'true') where.starred = true;
-    if (owned === 'true') where.isOwned = true;
-    if (owned === 'false') where.isOwned = false;
     if (query) where.name = { contains: query, mode: 'insensitive' };
+    if (category === 'docs') {
+      where.mimeType = {
+        in: [
+          'application/pdf',
+          'application/vnd.google-apps.document',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.oasis.opendocument.text',
+          'text/plain',
+          'text/html',
+          'application/rtf',
+        ],
+      };
+    } else if (category === 'archives') {
+      where.mimeType = {
+        in: ['application/zip', 'application/x-rar-compressed', 'application/x-tar', 'application/gzip', 'application/x-7z-compressed'],
+      };
+    }
 
     const orderBy: Prisma.FileIndexOrderByWithRelationInput = {};
     if (sortBy === 'name') orderBy.name = sortDir === 'asc' ? 'asc' : 'desc';
     else if (sortBy === 'size') orderBy.size = sortDir === 'asc' ? 'asc' : 'desc';
     else orderBy.modifiedAtProvider = sortDir === 'asc' ? 'asc' : 'desc';
 
-    const total = await prisma.fileIndex.count({ where });
+    let total: number | null = null;
+    if (!cursor) {
+      total = await prisma.fileIndex.count({ where });
+    }
 
     const files = await prisma.fileIndex.findMany({
       where,
@@ -216,11 +259,18 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const visible = hasMore ? files.slice(0, limit) : files;
     const nextCursor = hasMore ? visible[visible.length - 1]?.id ?? null : null;
 
-    res.json({
+    const result = {
       success: true,
       data: visible,
       meta: { limit, hasMore, nextCursor, total },
-    });
+    };
+
+    if (!cursor) {
+      const cacheKey = `files:${userId}:${createHash('sha256').update(JSON.stringify(req.query)).digest('hex').slice(0, 32)}`;
+      redis.set(cacheKey, JSON.stringify(result), 'EX', 15).catch(() => {});
+    }
+
+    res.json(result);
   } catch (err) {
     next(err);
   }
@@ -449,15 +499,19 @@ router.post('/:fileId/trash', async (req: Request, res: Response, next: NextFunc
       return;
     }
 
-    await driveTrash(owned.account.id, owned.file.providerId);
-
-    const updated = await prisma.fileIndex.update({
-      where: { id: fileId },
-      data: { isTrashed: true },
-      include: { account: accountSelect },
-    });
-
-    res.json({ success: true, data: updated });
+    if (owned.file.isOwned) {
+      await driveTrash(owned.account.id, owned.file.providerId);
+      const updated = await prisma.fileIndex.update({
+        where: { id: fileId },
+        data: { isTrashed: true },
+        include: { account: accountSelect },
+      });
+      res.json({ success: true, data: updated });
+    } else {
+      await permanentlyDeleteFile(owned.account.id, owned.file.providerId);
+      await prisma.fileIndex.delete({ where: { id: fileId } });
+      res.json({ success: true, data: { id: fileId, action: 'removed', message: 'Shared file removed from Drive view' } });
+    }
   } catch (err) {
     if (isPermissionError(err)) {
       permissionDenied(res);
@@ -553,6 +607,68 @@ router.post('/:fileId/copy', async (req: Request, res: Response, next: NextFunct
     });
 
     res.status(201).json({ success: true, data: fileIndex });
+  } catch (err) {
+    if (isPermissionError(err)) {
+      permissionDenied(res);
+      return;
+    }
+    next(err);
+  }
+});
+
+router.post('/:fileId/move-across', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req.user as Express.User).id;
+    const fileId = req.params.fileId as string;
+    const { targetAccountId, targetFolderId } = req.body as { targetAccountId?: string; targetFolderId?: string };
+
+    if (!targetAccountId) {
+      res.status(400).json({ success: false, error: { code: 'MISSING_TARGET', message: 'targetAccountId is required' } });
+      return;
+    }
+
+    const owned = await verifyOwnership(userId, fileId);
+    if (!owned) {
+      res.status(404).json({ success: false, error: { code: 'FILE_NOT_FOUND', message: 'File not found' } });
+      return;
+    }
+
+    const targetAccount = await prisma.connectedAccount.findFirst({
+      where: { id: targetAccountId, userId, isActive: true },
+    });
+    if (!targetAccount) {
+      res.status(404).json({ success: false, error: { code: 'TARGET_NOT_FOUND', message: 'Target account not found' } });
+      return;
+    }
+
+    const { stream, mimeType, name } = await downloadFile(owned.account.id, owned.file.providerId);
+
+    const driveFile = await driveUpload(targetAccount.id, name, mimeType, stream, targetFolderId);
+
+    await permanentlyDeleteFile(owned.account.id, owned.file.providerId);
+
+    const fileIndex = await prisma.fileIndex.create({
+      data: {
+        accountId: targetAccount.id,
+        providerId: driveFile.id!,
+        name: driveFile.name ?? owned.file.name,
+        mimeType: driveFile.mimeType ?? owned.file.mimeType,
+        size: driveFile.size ? BigInt(driveFile.size) : owned.file.size,
+        isFolder: owned.file.isFolder,
+        isTrashed: false,
+        parentFolderId: targetFolderId ?? null,
+        webViewLink: driveFile.webViewLink ?? owned.file.webViewLink,
+        iconLink: driveFile.iconLink ?? owned.file.iconLink,
+        thumbnailLink: driveFile.thumbnailLink ?? owned.file.thumbnailLink,
+        starred: false,
+        md5Checksum: driveFile.md5Checksum ?? owned.file.md5Checksum,
+      },
+      include: { account: { select: { email: true, displayName: true } } },
+    });
+
+    await prisma.fileIndex.delete({ where: { id: fileId } });
+
+    res.json({ success: true, data: fileIndex });
   } catch (err) {
     if (isPermissionError(err)) {
       permissionDenied(res);

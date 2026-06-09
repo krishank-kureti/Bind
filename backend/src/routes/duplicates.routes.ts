@@ -2,7 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { prisma } from '../config/prisma.js';
 import { duplicatesQueue } from '../workers/queue.js';
-import { permanentlyDeleteFile, trashFile } from '../services/drive.service.js';
+import { permanentlyDeleteFile } from '../services/drive.service.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -166,14 +166,11 @@ router.post('/:id/resolve', async (req: Request, res: Response, next: NextFuncti
           await prisma.fileIndex.delete({ where: { id: fileIndexRecord.id } });
           results.push({ fileId: fileIndexRecord.id, action: 'permanently_deleted', success: true });
         } else {
-          await trashFile(fileIndexRecord.accountId, fileIndexRecord.providerId).catch((driveErr: unknown) => {
+          await permanentlyDeleteFile(fileIndexRecord.accountId, fileIndexRecord.providerId).catch((driveErr: unknown) => {
             if (!isFileNotFound(driveErr)) throw driveErr;
           });
-          await prisma.fileIndex.update({
-            where: { id: fileIndexRecord.id },
-            data: { isTrashed: true },
-          });
-          results.push({ fileId: fileIndexRecord.id, action: 'trashed', success: true });
+          await prisma.fileIndex.delete({ where: { id: fileIndexRecord.id } });
+          results.push({ fileId: fileIndexRecord.id, action: 'removed_from_drive', success: true });
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error';

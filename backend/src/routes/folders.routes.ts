@@ -1,6 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { prisma } from '../config/prisma.js';
+import type { Prisma } from '../generated/prisma/client.js';
 
 const router = Router();
 
@@ -28,6 +29,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         accountId: { in: accountIds },
         isFolder: true,
         isTrashed: false,
+        isOwned: true,
         parentFolderId: null,
       },
       orderBy: { name: 'asc' },
@@ -55,11 +57,12 @@ router.get('/:folderId/contents', async (req: Request, res: Response, next: Next
 
     const accountIds = accounts.map((a) => a.id);
 
-    const where = {
+    const where: Prisma.FileIndexWhereInput = {
       accountId: { in: accountIds },
       parentFolderId: folderId,
       isTrashed: false,
-    } as const;
+      isOwned: true,
+    };
 
     const total = await prisma.fileIndex.count({ where });
 

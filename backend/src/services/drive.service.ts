@@ -147,7 +147,7 @@ export async function restoreFile(accountId: string, providerId: string): Promis
 export async function permanentlyDeleteFile(accountId: string, providerId: string): Promise<void> {
   const token = await getValidAccessToken(accountId);
   const drive = getDriveClient(token);
-  await drive.files.delete({ fileId: providerId });
+  await drive.files.delete({ fileId: providerId, supportsAllDrives: true });
 }
 
 export async function copyFile(accountId: string, providerId: string): Promise<drive_v3.Schema$File> {

@@ -1,7 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { prisma } from '../config/prisma.js';
-import { getAccountQuota, refreshAccountQuota } from '../services/storage.service.js';
+import { getOrRefreshQuota, refreshAccountQuota } from '../services/storage.service.js';
 
 const router = Router();
 
@@ -18,8 +18,12 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
     const quotas = await Promise.all(
       accounts.map(async (a) => {
-        const q = await getAccountQuota(a.id);
-        return { accountId: a.id, ...(q ? { totalBytes: q.totalBytes, usedBytes: q.usedBytes, refreshedAt: q.refreshedAt } : { totalBytes: null, usedBytes: null, refreshedAt: null }) };
+        try {
+          const q = await getOrRefreshQuota(a.id);
+          return { accountId: a.id, ...(q ? { totalBytes: q.totalBytes, usedBytes: q.usedBytes, refreshedAt: q.refreshedAt } : { totalBytes: null, usedBytes: null, refreshedAt: null }) };
+        } catch {
+          return { accountId: a.id, totalBytes: null, usedBytes: null, refreshedAt: null };
+        }
       }),
     );
 
@@ -58,7 +62,7 @@ router.get('/:accountId/quota', async (req: Request, res: Response, next: NextFu
       return;
     }
 
-    const quota = await getAccountQuota(accountId);
+    const quota = await getOrRefreshQuota(accountId);
     res.json({ success: true, data: quota });
   } catch (err) {
     next(err);
