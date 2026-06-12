@@ -63,7 +63,6 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       WHERE
         fi."accountId" = ANY(${accountIds}::text[])
         AND fi."isTrashed" = false
-        AND fi."isOwned" = true
         AND fi."searchVector" @@ plainto_tsquery('english', ${q})
       ORDER BY rank DESC, fi."modifiedAtProvider" DESC NULLS LAST
       LIMIT ${limit}
@@ -77,7 +76,6 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       WHERE
         fi."accountId" = ANY(${accountIds}::text[])
         AND fi."isTrashed" = false
-        AND fi."isOwned" = true
         AND fi."searchVector" @@ plainto_tsquery('english', ${q})
     `;
 

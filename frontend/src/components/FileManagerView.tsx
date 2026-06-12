@@ -3,16 +3,9 @@ import { CloudFile, CloudAccount } from "../types";
 import { Folder, FileText, Image, FileArchive, Star, Trash2, FolderPlus, Upload, Shield, ChevronRight, File, Music, MoreHorizontal, Edit3, Copy, Move, X, Check, CreditCard, ExternalLink, RotateCw, RefreshCw } from "lucide-react";
 
 interface FileManagerViewProps {
-  files: CloudFile[];
   accounts: CloudAccount[];
-  onToggleStar: (id: string) => void;
-  onDeleteFile: (id: string) => void;
-  onRenameFile: (id: string, name: string) => void;
-  onCopyFile: (id: string) => void;
-  onMoveFile: (id: string, folderId: string) => void;
-  onMoveAcrossAccounts: (id: string, targetAccountId: string, targetFolderId?: string) => void;
+  refreshTick: number;
   onOpenUploadModal: () => void;
-  onRefreshData: () => void;
 }
 
 function formatBytes(bytes: number, decimals = 1): string {
@@ -67,8 +60,9 @@ interface BreadcrumbItem {
 
 const BASE_LIMIT = 50;
 
-export default function FileManagerView({ files: _files, accounts, onToggleStar, onDeleteFile, onRenameFile, onCopyFile, onMoveFile, onMoveAcrossAccounts, onOpenUploadModal, onRefreshData }: FileManagerViewProps) {
-  const [activeFilter, setActiveFilter] = useState('all');
+export default function FileManagerView({ accounts, refreshTick, onOpenUploadModal }: FileManagerViewProps) {
+  const [ownershipFilter, setOwnershipFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [navigatedFolderId, setNavigatedFolderId] = useState<string | null>(null);
@@ -89,7 +83,66 @@ export default function FileManagerView({ files: _files, accounts, onToggleStar,
   const [moveTargetAccountId, setMoveTargetAccountId] = useState<string | null>(null);
   const [moveTargetFolderId, setMoveTargetFolderId] = useState<string | null>(null);
   const [allFolders, setAllFolders] = useState<CloudFile[]>([]);
+  const [syncNotification, setSyncNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setSyncNotification({ message, type });
+    setTimeout(() => setSyncNotification(null), 4000);
+  };
+
+  const handleToggleStar = async (fileId: string) => {
+    const prev = localFiles;
+    setLocalFiles((p) => p.map((f) => f.id === fileId ? { ...f, starred: !f.starred } : f));
+    setOpenMenuFileId(null);
+    setMenuPosition(null);
+    const res = await fetch(`/api/files/${fileId}/star`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    if (!res.ok) { setLocalFiles(prev); showToast('Failed to update star', 'error'); }
+  };
+
+  const handleDeleteFile = async (fileId: string) => {
+    const prev = localFiles;
+    setLocalFiles((p) => p.filter((f) => f.id !== fileId));
+    setOpenMenuFileId(null);
+    setMenuPosition(null);
+    const res = await fetch(`/api/files/${fileId}/trash`, { method: 'POST' });
+    if (!res.ok) { setLocalFiles(prev); showToast('Failed to trash file', 'error'); }
+  };
+
+  const handleRenameFile = async (fileId: string, name: string) => {
+    const prev = localFiles;
+    setLocalFiles((p) => p.map((f) => f.id === fileId ? { ...f, name } : f));
+    const res = await fetch(`/api/files/${fileId}/rename`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+    if (!res.ok) { setLocalFiles(prev); showToast('Failed to rename file', 'error'); }
+  };
+
+  const handleCopyFile = async (fileId: string) => {
+    const prev = localFiles;
+    setOpenMenuFileId(null);
+    setMenuPosition(null);
+    const res = await fetch(`/api/files/${fileId}/copy`, { method: 'POST' });
+    if (res.ok) {
+      const body = await res.json();
+      const newFile = transformFile(body.data);
+      setLocalFiles((p) => [newFile, ...p]);
+    } else {
+      showToast('Failed to copy file', 'error');
+    }
+  };
+
+  const handleMoveFile = async (fileId: string, folderId: string) => {
+    const prev = localFiles;
+    setLocalFiles((p) => p.filter((f) => f.id !== fileId));
+    const res = await fetch(`/api/files/${fileId}/move`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folderId }) });
+    if (!res.ok) { setLocalFiles(prev); showToast('Failed to move file', 'error'); }
+  };
+
+  const handleMoveAcrossAccounts = async (fileId: string, targetAccountId: string, targetFolderId?: string) => {
+    const prev = localFiles;
+    setLocalFiles((p) => p.filter((f) => f.id !== fileId));
+    const res = await fetch(`/api/files/${fileId}/move-across`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetAccountId, targetFolderId }) });
+    if (!res.ok) { setLocalFiles(prev); showToast('Failed to move file', 'error'); }
+  };
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -110,7 +163,7 @@ export default function FileManagerView({ files: _files, accounts, onToggleStar,
     setActiveAccountId(null);
     setSearchQuery('');
     setDebouncedSearch('');
-  }, [activeFilter]);
+  }, [ownershipFilter, categoryFilter]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
@@ -119,10 +172,10 @@ export default function FileManagerView({ files: _files, accounts, onToggleStar,
 
   useEffect(() => {
     fetchFiles(false);
-  }, [activeFilter, navigatedFolderId, activeAccountId, debouncedSearch]);
+  }, [ownershipFilter, categoryFilter, navigatedFolderId, activeAccountId, debouncedSearch, refreshTick]);
 
   const getFilterParams = (): Record<string, string> => {
-    switch (activeFilter) {
+    switch (categoryFilter) {
       case 'images': return { mimeType: 'image/*' };
       case 'audio': return { mimeType: 'audio/*' };
       case 'video': return { mimeType: 'video/*' };
@@ -137,7 +190,9 @@ export default function FileManagerView({ files: _files, accounts, onToggleStar,
 
     const filterParams = getFilterParams();
     for (const [k, v] of Object.entries(filterParams)) params.set(k, v);
-    if (activeFilter === 'starred') params.set('starred', 'true');
+    if (categoryFilter === 'starred') params.set('starred', 'true');
+    if (ownershipFilter === 'owned') params.set('owned', 'true');
+    if (ownershipFilter === 'shared') params.set('owned', 'false');
     if (navigatedFolderId) params.set('folderId', navigatedFolderId);
     if (activeAccountId) params.set('accountId', activeAccountId);
     if (debouncedSearch) params.set('query', debouncedSearch);
@@ -183,8 +238,13 @@ export default function FileManagerView({ files: _files, accounts, onToggleStar,
     }
   };
 
-  const filters = [
+  const ownershipFilters = [
     { id: 'all', label: 'All Files', icon: null },
+    { id: 'owned', label: 'Owned', icon: null },
+    { id: 'shared', label: 'Shared', icon: null },
+  ];
+
+  const categoryFilters = [
     { id: 'images', label: 'Images', icon: Image },
     { id: 'docs', label: 'Docs', icon: FileText },
     { id: 'audio', label: 'Audio', icon: Music },
@@ -192,7 +252,7 @@ export default function FileManagerView({ files: _files, accounts, onToggleStar,
     { id: 'accounts', label: 'Accounts', icon: CreditCard },
   ];
 
-  const isInAccountsMode = activeFilter === 'accounts';
+  const isInAccountsMode = categoryFilter === 'accounts';
 
   const folders = localFiles.filter((f) => f.isFolder);
   const nonFolders = localFiles.filter((f) => !f.isFolder);
@@ -248,7 +308,7 @@ export default function FileManagerView({ files: _files, accounts, onToggleStar,
 
   const submitRename = () => {
     if (renameFileId && renameValue.trim()) {
-      onRenameFile(renameFileId, renameValue.trim());
+      handleRenameFile(renameFileId, renameValue.trim());
     }
     setRenameFileId(null);
     setRenameValue('');
@@ -267,9 +327,9 @@ export default function FileManagerView({ files: _files, accounts, onToggleStar,
   const submitMove = () => {
     if (!moveFileId) return;
     if (moveMode === 'same') {
-      onMoveFile(moveFileId, moveTargetFolderId || 'root');
+      handleMoveFile(moveFileId, moveTargetFolderId || 'root');
     } else if (moveTargetAccountId) {
-      onMoveAcrossAccounts(moveFileId, moveTargetAccountId, moveTargetFolderId || undefined);
+      handleMoveAcrossAccounts(moveFileId, moveTargetAccountId, moveTargetFolderId || undefined);
     }
     setMoveDialogOpen(false);
     setMoveFileId(null);
@@ -314,15 +374,31 @@ export default function FileManagerView({ files: _files, accounts, onToggleStar,
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 border-b-2 border-black pb-2">
-            {filters.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeFilter === tab.id;
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            {ownershipFilters.map((tab) => {
+              const isActive = ownershipFilter === tab.id;
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveFilter(tab.id)}
+                  onClick={() => setOwnershipFilter(tab.id)}
+                  className={`h-7 px-3 rounded-none text-[10px] font-extrabold uppercase tracking-widest border cursor-pointer transition-all ${
+                    isActive ? "bg-black text-white border-black shadow-[2px_2px_0px_0px_#3b82f6]" : "bg-white text-black border-black hover:bg-slate-50"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-2 border-b-2 border-black pb-2">
+            {categoryFilters.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = categoryFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setCategoryFilter(tab.id === categoryFilter ? 'all' : tab.id)}
                   className={`h-8 px-4 rounded-none text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 border cursor-pointer transition-all ${
                     isActive ? "bg-black text-white border-black shadow-[2.5px_2.5px_0px_0px_#3b82f6]" : "bg-white text-black border-black hover:bg-slate-50"
                   }`}
@@ -450,20 +526,20 @@ export default function FileManagerView({ files: _files, accounts, onToggleStar,
         if (!file) return null;
         return (
           <div ref={menuRef} className="fixed z-50 bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] w-44 py-1" style={{ top: menuPosition.top, left: menuPosition.left }}>
-            <button onClick={() => { onToggleStar(file.id); setOpenMenuFileId(null); setMenuPosition(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-wider hover:bg-slate-50 text-left">
+            <button onClick={() => handleToggleStar(file.id)} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-wider hover:bg-slate-50 text-left">
               <Star className={`w-3.5 h-3.5 ${file.starred ? 'text-amber-500 fill-amber-500' : 'text-slate-400'}`} /> {file.starred ? 'Unstar' : 'Star'}
             </button>
             <button onClick={() => openRename(file)} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-wider hover:bg-slate-50 text-left">
               <Edit3 className="w-3.5 h-3.5 text-slate-400" /> Rename
             </button>
-            <button onClick={() => { onCopyFile(file.id); setOpenMenuFileId(null); setMenuPosition(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-wider hover:bg-slate-50 text-left">
+            <button onClick={() => handleCopyFile(file.id)} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-wider hover:bg-slate-50 text-left">
               <Copy className="w-3.5 h-3.5 text-slate-400" /> Copy
             </button>
             <button onClick={() => openMoveDialog(file.id)} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-wider hover:bg-slate-50 text-left">
               <Move className="w-3.5 h-3.5 text-slate-400" /> Move
             </button>
             <div className="border-t border-black my-1" />
-            <button onClick={() => { onDeleteFile(file.id); setOpenMenuFileId(null); setMenuPosition(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-wider hover:bg-red-50 text-red-600 text-left">
+            <button onClick={() => handleDeleteFile(file.id)} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-wider hover:bg-red-50 text-red-600 text-left">
               <Trash2 className="w-3.5 h-3.5" /> Trash
             </button>
           </div>
@@ -528,6 +604,22 @@ export default function FileManagerView({ files: _files, accounts, onToggleStar,
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {syncNotification && (
+        <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-bottom-2 fade-in">
+          <div className={`bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] px-5 py-3.5 flex items-center gap-3 min-w-[280px] max-w-sm`}>
+            <div className={`w-8 h-8 border border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0px_rgba(0,0,0,1)] ${syncNotification.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`}>
+              {syncNotification.type === 'success' ? <Check className="w-4 h-4 text-white" /> : <X className="w-4 h-4 text-white" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-extrabold uppercase tracking-widest text-black break-words">{syncNotification.message}</p>
+            </div>
+            <button onClick={() => setSyncNotification(null)} className="text-slate-400 hover:text-black transition-colors shrink-0">
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}

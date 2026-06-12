@@ -8,6 +8,7 @@ import { createIndexWorker } from './workers/indexFiles.worker.js';
 import { createSyncWorker } from './workers/syncAccount.worker.js';
 import { createUploadWorker } from './workers/processUpload.worker.js';
 import { createDuplicateWorker } from './workers/duplicates.worker.js';
+import { createLazySyncWorker } from './workers/lazySync.worker.js';
 
 async function main(): Promise<void> {
   await prisma.$connect();
@@ -32,6 +33,7 @@ async function main(): Promise<void> {
   const syncWorker = createSyncWorker();
   const uploadWorker = createUploadWorker();
   const duplicateWorker = createDuplicateWorker();
+  const lazySyncWorker = createLazySyncWorker();
   logger.info('BullMQ workers started');
 
   // Schedule periodic sync (every 30 minutes)
@@ -56,6 +58,7 @@ async function main(): Promise<void> {
     await syncWorker.close();
     await uploadWorker.close();
     await duplicateWorker.close();
+    await lazySyncWorker.close();
     await prisma.$disconnect();
     redis.disconnect();
     process.exit(0);

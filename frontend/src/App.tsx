@@ -71,6 +71,7 @@ export default function App() {
   const [accounts, setAccounts] = useState<CloudAccount[]>([]);
   const [files, setFiles] = useState<CloudFile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshTick, setRefreshTick] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -237,49 +238,19 @@ export default function App() {
     }
   };
 
-  const handleToggleStar = async (fileId: string) => {
-    const res = await fetch(`/api/files/${fileId}/star`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-    if (res.ok) fetchAllData();
-  };
-
-  const handleDeleteFile = async (fileId: string) => {
-    const res = await fetch(`/api/files/${fileId}/trash`, { method: 'POST' });
-    if (res.ok) fetchAllData();
-  };
-
-  const handleRenameFile = async (fileId: string, name: string) => {
-    await fetch(`/api/files/${fileId}/rename`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
-    fetchAllData(true);
-  };
-
-  const handleCopyFile = async (fileId: string) => {
-    const res = await fetch(`/api/files/${fileId}/copy`, { method: 'POST' });
-    if (res.ok) fetchAllData(true);
-    else {
-      const body = await res.json();
-      alert(body.error?.message || 'Copy failed');
-    }
-  };
-
-  const handleMoveFile = async (fileId: string, folderId: string) => {
-    const res = await fetch(`/api/files/${fileId}/move`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folderId }) });
-    if (res.ok) fetchAllData(true);
-    else {
-      const body = await res.json();
-      alert(body.error?.message || 'Move failed');
-    }
-  };
-
-  const handleMoveAcrossAccounts = async (fileId: string, targetAccountId: string, targetFolderId?: string) => {
-    const res = await fetch(`/api/files/${fileId}/move-across`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetAccountId, targetFolderId }) });
-    if (res.ok) fetchAllData(true);
-    else {
-      const body = await res.json();
-      alert(body.error?.message || 'Move failed');
-    }
-  };
-
   const handleConnectAccount = () => { window.location.href = '/api/auth/google'; };
+
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    setAccounts([]);
+    setFiles([]);
+    setCurrentTab('dashboard');
+    setIsAuthenticated(false);
+    setAuthChecked(true);
+    setLoading(false);
+    setSplashDone(false);
+    setSplashProgress(0);
+  };
 
   const handleDisconnectAccount = async (id: string) => {
     const res = await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
@@ -344,7 +315,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
-      <SideNavBar currentTab={currentTab} setCurrentTab={setCurrentTab} onOpenConnectModal={() => setIsConnectOpen(true)} accountsCount={accounts.length} />
+      <SideNavBar currentTab={currentTab} setCurrentTab={setCurrentTab} onOpenConnectModal={() => setIsConnectOpen(true)} accountsCount={accounts.length} onLogout={handleLogout} />
       <div className="flex-1 ml-64 flex flex-col min-h-screen relative font-sans">
         <TopNavBar currentTab={currentTab} />
         <main className="flex-1 p-8 pt-24 overflow-y-auto">
@@ -357,7 +328,7 @@ export default function App() {
         </main>
       </div>
       <ConnectAccountModal isOpen={isConnectOpen} onClose={() => setIsConnectOpen(false)} onSubmit={handleConnectAccount} />
-      <UploadModal isOpen={isUploadOpen} onClose={() => { setIsUploadOpen(false); fetchAllData(true); }} accounts={accounts} />
+      <UploadModal isOpen={isUploadOpen} onClose={() => { setIsUploadOpen(false); fetchAllData(true); setRefreshTick((t) => t + 1); }} accounts={accounts} />
       {syncNotification && (
         <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-bottom-2 fade-in">
           <div className={`bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] px-5 py-3.5 flex items-center gap-3 min-w-[280px] max-w-sm`}>
@@ -381,7 +352,7 @@ export default function App() {
       case 'dashboard':
         return <DashboardView accounts={accounts} files={files} onOpenUploadModal={() => setIsUploadOpen(true)} isSyncing={isSyncing} onRefreshStorage={refreshStorageOnly} onNavigateIntelligence={() => setCurrentTab('intelligence')} onSyncAccounts={handleSyncAllAccounts} />;
       case 'files':
-        return <FileManagerView files={files} accounts={accounts} onToggleStar={handleToggleStar} onDeleteFile={handleDeleteFile} onRenameFile={handleRenameFile} onCopyFile={handleCopyFile} onMoveFile={handleMoveFile} onMoveAcrossAccounts={handleMoveAcrossAccounts} onOpenUploadModal={() => setIsUploadOpen(true)} onRefreshData={() => fetchAllData(true)} />;
+        return <FileManagerView accounts={accounts} refreshTick={refreshTick} onOpenUploadModal={() => setIsUploadOpen(true)} />;
       case 'intelligence':
         return <IntelligenceView accounts={accounts} files={files} onRefreshAllData={() => fetchAllData(true)} />;
       case 'accounts':

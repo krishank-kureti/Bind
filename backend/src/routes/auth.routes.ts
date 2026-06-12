@@ -27,7 +27,10 @@ router.post('/logout', (req, res, next) => {
       next(err);
       return;
     }
-    res.redirect(env.FRONTEND_URL);
+    req.session.destroy(() => {
+      res.clearCookie('connect.sid');
+      res.json({ success: true });
+    });
   });
 });
 

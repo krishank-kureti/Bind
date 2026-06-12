@@ -50,6 +50,21 @@ export default function IntelligenceView({ accounts, files, onRefreshAllData }: 
     }
   };
 
+  const handleScan = async () => {
+    setLoading(true);
+    try {
+      await fetch('/api/duplicates/scan', { method: 'POST' });
+      // Wait a bit for the scan to complete, then reload
+      await new Promise((r) => setTimeout(r, 3000));
+      await fetchDuplicates();
+      onRefreshAllData();
+    } catch (e) {
+      console.error('Scan failed', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => { fetchDuplicates(); }, [files]);
 
   const handleResolve = async (groupId: string) => {
@@ -95,7 +110,7 @@ export default function IntelligenceView({ accounts, files, onRefreshAllData }: 
             </p>
           </div>
         </div>
-        <button onClick={fetchDuplicates} disabled={loading} className="geo-btn-primary h-12 px-6 text-xs shrink-0">
+        <button onClick={handleScan} disabled={loading} className="geo-btn-primary h-12 px-6 text-xs shrink-0">
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> {loading ? 'Scanning...' : 'Scan Now'}
         </button>
       </section>

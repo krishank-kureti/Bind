@@ -12,6 +12,7 @@ router.use(requireAuth);
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = (req.user as Express.User).id;
+    const { owned } = req.query as Record<string, string | undefined>;
 
     const accounts = await prisma.connectedAccount.findMany({
       where: { userId, isActive: true },
@@ -29,7 +30,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         accountId: { in: accountIds },
         isFolder: true,
         isTrashed: false,
-        isOwned: true,
+        ...(owned === 'true' ? { isOwned: true } : owned === 'false' ? { isOwned: false } : {}),
         parentFolderId: null,
       },
       orderBy: { name: 'asc' },
@@ -46,7 +47,7 @@ router.get('/:folderId/contents', async (req: Request, res: Response, next: Next
   try {
     const userId = (req.user as Express.User).id;
     const folderId = req.params.folderId as string;
-    const { limit: limitStr, cursor } = req.query as Record<string, string | undefined>;
+    const { limit: limitStr, cursor, owned } = req.query as Record<string, string | undefined>;
 
     const limit = Math.min(Math.max(Number(limitStr) || 50, 1), 200);
 
@@ -61,7 +62,7 @@ router.get('/:folderId/contents', async (req: Request, res: Response, next: Next
       accountId: { in: accountIds },
       parentFolderId: folderId,
       isTrashed: false,
-      isOwned: true,
+      ...(owned === 'true' ? { isOwned: true } : owned === 'false' ? { isOwned: false } : {}),
     };
 
     const total = await prisma.fileIndex.count({ where });

@@ -1,11 +1,12 @@
 import React from "react";
-import { LayoutDashboard, FolderOpen, Brain, CreditCard, Plus, Settings, HelpCircle, Cloud } from "lucide-react";
+import { LayoutDashboard, FolderOpen, Brain, CreditCard, Plus, Settings, HelpCircle, Cloud, LogOut } from "lucide-react";
 
 interface SideNavBarProps {
   currentTab: string;
   setCurrentTab: (tab: string) => void;
   onOpenConnectModal: () => void;
   accountsCount: number;
+  onLogout: () => void;
 }
 
 const navItems = [
@@ -20,7 +21,7 @@ const footerItems = [
   { id: "support", label: "Support", icon: HelpCircle },
 ];
 
-export default function SideNavBar({ currentTab, setCurrentTab, onOpenConnectModal, accountsCount }: SideNavBarProps) {
+export default function SideNavBar({ currentTab, setCurrentTab, onOpenConnectModal, accountsCount, onLogout }: SideNavBarProps) {
   return (
     <aside className="w-64 border-r-2 border-black bg-white flex flex-col h-screen fixed left-0 top-0 z-20">
       <div className="p-6 flex items-center gap-3 border-b-2 border-black bg-slate-50">
@@ -73,7 +74,7 @@ export default function SideNavBar({ currentTab, setCurrentTab, onOpenConnectMod
         </div>
       </div>
 
-      <div className="p-4 border-t-2 border-black bg-[#f8fafc]">
+      <div className="p-4 border-t-2 border-black bg-[#f8fafc] space-y-1.5">
         <ul className="space-y-1.5">
           {footerItems.map((item) => {
             const Icon = item.icon;
@@ -92,6 +93,9 @@ export default function SideNavBar({ currentTab, setCurrentTab, onOpenConnectMod
             );
           })}
         </ul>
+        <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-2 rounded-none text-[11px] font-bold uppercase tracking-wider border border-transparent text-red-500 hover:border-red-400 hover:bg-red-50 transition-all cursor-pointer">
+          <LogOut className="w-4 h-4" /> <span>Logout</span>
+        </button>
       </div>
     </aside>
   );

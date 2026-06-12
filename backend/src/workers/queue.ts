@@ -43,3 +43,13 @@ export const duplicatesQueue = new Queue('duplicates-queue', {
     removeOnFail: 20,
   },
 });
+
+export const lazySyncQueue = new Queue('lazy-sync', {
+  connection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'fixed', delay: 10000 },
+    removeOnComplete: true,
+    removeOnFail: true,
+  },
+});
