@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { CloudAccount, CloudFile, DuplicateGroup } from "../types";
 import { ShieldAlert, RefreshCw, FileText, CheckSquare, Trash2 } from "lucide-react";
+import { apiFetch } from "../api";
 
 interface IntelligenceViewProps {
   accounts: CloudAccount[];
@@ -40,7 +41,7 @@ export default function IntelligenceView({ accounts, files, onRefreshAllData }: 
   const fetchDuplicates = async () => {
     setLoading(true);
     try {
-      const dRes = await fetch('/api/duplicates');
+      const dRes = await apiFetch('/api/duplicates');
       const dBody = await dRes.json();
       setDupGroups((dBody.data || []).map(transformGroup));
     } catch (e) {
@@ -53,7 +54,7 @@ export default function IntelligenceView({ accounts, files, onRefreshAllData }: 
   const handleScan = async () => {
     setLoading(true);
     try {
-      await fetch('/api/duplicates/scan', { method: 'POST' });
+      await apiFetch('/api/duplicates/scan', { method: 'POST' });
       // Wait a bit for the scan to complete, then reload
       await new Promise((r) => setTimeout(r, 3000));
       await fetchDuplicates();
@@ -70,7 +71,7 @@ export default function IntelligenceView({ accounts, files, onRefreshAllData }: 
   const handleResolve = async (groupId: string) => {
     setResolving(groupId);
     try {
-      const res = await fetch(`/api/duplicates/${groupId}/resolve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+      const res = await apiFetch(`/api/duplicates/${groupId}/resolve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
       if (res.ok) {
         const body = await res.json();
         if (body.data?.partial) {

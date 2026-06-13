@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { CloudFile, CloudAccount } from "../types";
-import { Folder, FileText, Image, FileArchive, Star, Trash2, FolderPlus, Upload, Shield, ChevronRight, File, Music, MoreHorizontal, Edit3, Copy, Move, X, Check, CreditCard, ExternalLink, RotateCw, RefreshCw } from "lucide-react";
+import { Folder, FileText, Image, FileArchive, Star, Trash2, Upload, Shield, ChevronRight, File, Music, MoreHorizontal, Edit3, Copy, Move, X, Check, CreditCard, RotateCw, RefreshCw } from "lucide-react";
+import { apiFetch } from "../api";
 
 interface FileManagerViewProps {
   accounts: CloudAccount[];
@@ -96,7 +97,7 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
     setLocalFiles((p) => p.map((f) => f.id === fileId ? { ...f, starred: !f.starred } : f));
     setOpenMenuFileId(null);
     setMenuPosition(null);
-    const res = await fetch(`/api/files/${fileId}/star`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    const res = await apiFetch(`/api/files/${fileId}/star`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' });
     if (!res.ok) { setLocalFiles(prev); showToast('Failed to update star', 'error'); }
   };
 
@@ -105,14 +106,14 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
     setLocalFiles((p) => p.filter((f) => f.id !== fileId));
     setOpenMenuFileId(null);
     setMenuPosition(null);
-    const res = await fetch(`/api/files/${fileId}/trash`, { method: 'POST' });
+    const res = await apiFetch(`/api/files/${fileId}/trash`, { method: 'POST' });
     if (!res.ok) { setLocalFiles(prev); showToast('Failed to trash file', 'error'); }
   };
 
   const handleRenameFile = async (fileId: string, name: string) => {
     const prev = localFiles;
     setLocalFiles((p) => p.map((f) => f.id === fileId ? { ...f, name } : f));
-    const res = await fetch(`/api/files/${fileId}/rename`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+    const res = await apiFetch(`/api/files/${fileId}/rename`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
     if (!res.ok) { setLocalFiles(prev); showToast('Failed to rename file', 'error'); }
   };
 
@@ -120,7 +121,7 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
     const prev = localFiles;
     setOpenMenuFileId(null);
     setMenuPosition(null);
-    const res = await fetch(`/api/files/${fileId}/copy`, { method: 'POST' });
+    const res = await apiFetch(`/api/files/${fileId}/copy`, { method: 'POST' });
     if (res.ok) {
       const body = await res.json();
       const newFile = transformFile(body.data);
@@ -133,14 +134,14 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
   const handleMoveFile = async (fileId: string, folderId: string) => {
     const prev = localFiles;
     setLocalFiles((p) => p.filter((f) => f.id !== fileId));
-    const res = await fetch(`/api/files/${fileId}/move`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folderId }) });
+    const res = await apiFetch(`/api/files/${fileId}/move`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folderId }) });
     if (!res.ok) { setLocalFiles(prev); showToast('Failed to move file', 'error'); }
   };
 
   const handleMoveAcrossAccounts = async (fileId: string, targetAccountId: string, targetFolderId?: string) => {
     const prev = localFiles;
     setLocalFiles((p) => p.filter((f) => f.id !== fileId));
-    const res = await fetch(`/api/files/${fileId}/move-across`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetAccountId, targetFolderId }) });
+    const res = await apiFetch(`/api/files/${fileId}/move-across`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetAccountId, targetFolderId }) });
     if (!res.ok) { setLocalFiles(prev); showToast('Failed to move file', 'error'); }
   };
 
@@ -206,7 +207,7 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
     try {
       const cursor = append ? nextCursor : null;
       const qs = buildQueryParams(cursor);
-      const res = await fetch(`/api/files?${qs}`);
+      const res = await apiFetch(`/api/files?${qs}`);
       if (res.ok) {
         const body = await res.json();
         const newFiles = (body.data || []).map(transformFile);
@@ -228,7 +229,7 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
       params.set('mimeType', 'application/vnd.google-apps.folder');
       params.set('limit', '500');
       if (activeAccountId) params.set('accountId', activeAccountId);
-      const res = await fetch(`/api/files?${params.toString()}`);
+      const res = await apiFetch(`/api/files?${params.toString()}`);
       if (res.ok) {
         const body = await res.json();
         setAllFolders((body.data || []).map(transformFile));

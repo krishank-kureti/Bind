@@ -40,8 +40,9 @@ app.use(helmet({
     },
   },
 }));
+const corsOrigins = env.CORS_ORIGINS.split(',').map(s => s.trim());
 app.use(cors({
-  origin: env.FRONTEND_URL,
+  origin: corsOrigins,
   credentials: true,
 }));
 
@@ -63,7 +64,7 @@ app.use(session({
   cookie: {
     httpOnly: true,
     secure: env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: env.NODE_ENV === 'production' ? 'none' : 'lax',
     maxAge: 24 * 60 * 60 * 1000,
   },
 }));

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { HelpCircle, ChevronDown, ChevronRight, Terminal, Bug, Send, CheckCircle } from "lucide-react";
+import { apiFetch } from "../api";
 
 const faqs = [
   { q: 'How do I connect a Google Drive account?', a: 'Navigate to Accounts → Add Account. You will be redirected to Google OAuth to authorize access to your Drive files.' },
@@ -27,7 +28,7 @@ export default function SupportView() {
       { label: 'API Server Reachable', status: 'ok' as const },
       { label: 'Database Connection', status: 'ok' as const },
       { label: 'Redis Connection', status: 'ok' as const },
-      { label: 'Google OAuth Config', status: (await fetch('/api/auth/me').then(r => r.ok) ? 'ok' : 'fail') as 'ok' | 'fail' },
+      { label: 'Google OAuth Config', status: (await apiFetch('/api/auth/me').then(r => r.ok) ? 'ok' : 'fail') as 'ok' | 'fail' },
     ];
     setDiagResults(results);
   };

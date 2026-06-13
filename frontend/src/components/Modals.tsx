@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { CloudAccount } from "../types";
 import { X, Cloud, Upload, ExternalLink, CheckCircle, XCircle, Clock, Loader } from "lucide-react";
+import { apiFetch } from "../api";
 
 interface ConnectAccountModalProps {
   isOpen: boolean;
@@ -93,7 +94,7 @@ export function UploadModal({ isOpen, onClose, accounts }: UploadModalProps) {
   const pollJobStatus = useCallback((entryId: string, jobId: string) => {
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/upload/${jobId}`);
+        const res = await apiFetch(`/api/upload/${jobId}`);
         if (res.ok) {
           const body = await res.json();
           const job = body.data;
@@ -156,7 +157,7 @@ export function UploadModal({ isOpen, onClose, accounts }: UploadModalProps) {
       const formData = new FormData();
       formData.append('file', entry.file);
       try {
-        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        const res = await apiFetch('/api/upload', { method: 'POST', body: formData });
         if (res.ok) {
           const body = await res.json();
           const jobId = body.data.id;

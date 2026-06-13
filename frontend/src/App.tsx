@@ -9,6 +9,7 @@ import AccountsView from './components/AccountsView';
 import SettingsView from './components/SettingsView';
 import SupportView from './components/SupportView';
 import { ConnectAccountModal, UploadModal } from './components/Modals';
+import { apiFetch } from './api';
 import { Cloud, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
 
 function categorizeMimeType(mimeType: string, isFolder: boolean): string {
@@ -83,7 +84,7 @@ export default function App() {
 
   const checkAuth = async () => {
     try {
-      const res = await fetch('/api/auth/me');
+      const res = await apiFetch('/api/auth/me');
       if (res.ok) {
         const body = await res.json();
         if (body.data?.user) {
@@ -122,9 +123,9 @@ export default function App() {
     if (showSync) setIsSyncing(true);
     try {
       const [accountsRes, filesRes, storageRes] = await Promise.all([
-        fetch('/api/accounts'),
-        fetch('/api/files?limit=50'),
-        fetch('/api/storage'),
+        apiFetch('/api/accounts'),
+        apiFetch('/api/files?limit=50'),
+        apiFetch('/api/storage'),
       ]);
 
       let accs: CloudAccount[] = [];
@@ -181,10 +182,10 @@ export default function App() {
   };
 
   const handleSyncAccount = async (accountId: string): Promise<'SYNCED' | 'ERROR'> => {
-    await fetch(`/api/accounts/${accountId}/sync`, { method: 'POST' });
+    await apiFetch(`/api/accounts/${accountId}/sync`, { method: 'POST' });
     for (let i = 0; i < 30; i++) {
       await new Promise((r) => setTimeout(r, 2000));
-      const res = await fetch(`/api/accounts/${accountId}/status`);
+      const res = await apiFetch(`/api/accounts/${accountId}/status`);
       if (res.ok) {
         const body = await res.json();
         const status = body.data?.syncStatus;
@@ -213,7 +214,7 @@ export default function App() {
   const refreshStorageOnly = async () => {
     setIsSyncing(true);
     try {
-      const res = await fetch('/api/storage');
+      const res = await apiFetch('/api/storage');
       if (res.ok) {
         const sbody = await res.json();
         const storage = sbody.data || sbody;
@@ -241,7 +242,7 @@ export default function App() {
   const handleConnectAccount = () => { window.location.href = '/api/auth/google'; };
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    await apiFetch('/api/auth/logout', { method: 'POST' });
     setAccounts([]);
     setFiles([]);
     setCurrentTab('dashboard');
@@ -253,7 +254,7 @@ export default function App() {
   };
 
   const handleDisconnectAccount = async (id: string) => {
-    const res = await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
+    const res = await apiFetch(`/api/accounts/${id}`, { method: 'DELETE' });
     if (res.ok) fetchAllData(true);
     else {
       const body = await res.json();
