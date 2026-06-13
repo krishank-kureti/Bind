@@ -1,5 +1,5 @@
 {
   "rewrites": [
-    { "source": "/api/:match*", "destination": "https://YOUR_RENDER_APP.onrender.com/api/:match*" }
+    { "source": "/api/:match*", "destination": "https://bind-a3nr.onrender.com/api/:match*" }
   ]
 }
