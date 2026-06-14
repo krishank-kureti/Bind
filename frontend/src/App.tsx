@@ -183,7 +183,7 @@ export default function App() {
 
   const handleSyncAccount = async (accountId: string): Promise<'SYNCED' | 'ERROR'> => {
     await apiFetch(`/api/accounts/${accountId}/sync`, { method: 'POST' });
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 90; i++) {
       await new Promise((r) => setTimeout(r, 2000));
       const res = await apiFetch(`/api/accounts/${accountId}/status`);
       if (res.ok) {
@@ -199,11 +199,8 @@ export default function App() {
 
   const handleSyncAllAccounts = async () => {
     setIsSyncing(true);
-    const failedAccounts: string[] = [];
-    for (const a of accounts) {
-      const result = await handleSyncAccount(a.id);
-      if (result === 'ERROR') failedAccounts.push(a.email.split('@')[0]);
-    }
+    const results = await Promise.all(accounts.map((a) => handleSyncAccount(a.id)));
+    const failedAccounts = accounts.filter((_, i) => results[i] === 'ERROR').map((a) => a.email.split('@')[0]);
     await fetchAllData(true);
     if (failedAccounts.length === 0) {
       setSyncNotification({ message: `All ${accounts.length} account${accounts.length > 1 ? 's' : ''} synced successfully`, type: 'success' });
