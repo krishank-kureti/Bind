@@ -1,4 +1,4 @@
-import { createReadStream } from 'fs';
+import { createReadStream, existsSync } from 'fs';
 import { unlink } from 'fs/promises';
 import { prisma } from '../config/prisma.js';
 import { uploadFile as driveUploadFile } from './drive.service.js';
@@ -12,31 +12,35 @@ export async function processUpload(jobId: string, tempPath: string): Promise<vo
   }
 
   try {
-    logger.info({ jobId, fileName: job.fileName, size: job.sizeBytes?.toString(), targetAccountId: job.targetAccountId }, '[1] Setting job to UPLOADING status');
+    logger.info("STEP 1");
 
     await prisma.uploadJob.update({
       where: { id: jobId },
       data: { status: 'UPLOADING', progress: 10 },
     });
 
-    logger.info({ jobId }, '[2] Database updated to UPLOADING');
+    logger.info("STEP 2");
+
+    logger.info({ exists: existsSync(tempPath), tempPath }, 'File existence check');
 
     const stream = createReadStream(tempPath);
 
-    logger.info({ jobId, tempPath, targetAccountId: job.targetAccountId, fileName: job.fileName, mimeType: job.mimeType }, '[3] Calling driveUploadFile');
+    logger.info("STEP 3");
 
-    const result = await driveUploadFile(
-      job.targetAccountId,
-      job.fileName,
-      job.mimeType,
-      stream,
-      job.targetFolderId ?? undefined,
-    );
+    const result = await Promise.race([
+      driveUploadFile(
+        job.targetAccountId,
+        job.fileName,
+        job.mimeType,
+        stream,
+        job.targetFolderId ?? undefined,
+      ),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Google upload timeout")), 30000)
+      ),
+    ]);
 
-    logger.info({ jobId }, '[4] driveUploadFile returned');
-    logger.info({ jobId, driveFileId: result.id, driveFileName: result.name, driveMimeType: result.mimeType, driveSize: result.size }, '[5] Uploaded to Drive, Google file ID');
-
-    logger.info({ jobId, driveFileId: result.id }, '[6] Updating upload job to COMPLETE');
+    logger.info("STEP 4");
 
     await prisma.uploadJob.update({
       where: { id: jobId },
@@ -47,7 +51,7 @@ export async function processUpload(jobId: string, tempPath: string): Promise<vo
       },
     });
 
-    logger.info({ jobId, driveFileId: result.id }, '[7] Upload job updated to COMPLETE successfully');
+    logger.info("STEP 5");
 
     await unlink(tempPath).catch(() => {});
   } catch (err) {
@@ -62,7 +66,7 @@ export async function processUpload(jobId: string, tempPath: string): Promise<vo
       googleApiStatus: gaxiosErr?.response?.status ?? undefined,
       googleApiUrl: gaxiosErr?.config?.url ?? undefined,
       googleApiMethod: gaxiosErr?.config?.method ?? undefined,
-    }, '[8] Upload job failed');
+    }, 'Upload job failed');
 
     await prisma.uploadJob.update({
       where: { id: jobId },

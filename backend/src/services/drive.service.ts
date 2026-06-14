@@ -55,8 +55,14 @@ export async function uploadFile(
   stream: Readable,
   parentFolderId?: string,
 ): Promise<drive_v3.Schema$File> {
+  const { logger } = await import('../utils/logger.js');
+
+  logger.info("Creating Drive client");
+
   const token = await getValidAccessToken(accountId);
   const drive = getDriveClient(token);
+
+  logger.info("About to call drive.files.create");
 
   const res = await drive.files.create({
     requestBody: {
@@ -69,6 +75,8 @@ export async function uploadFile(
     },
     fields: 'id,name,mimeType,size,webViewLink,webContentLink,parents',
   });
+
+  logger.info("Google returned");
 
   return res.data;
 }
