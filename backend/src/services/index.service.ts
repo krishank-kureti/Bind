@@ -40,7 +40,9 @@ export async function indexAccount(accountId: string): Promise<number> {
       );
     }
 
-    await prisma.$transaction(batch);
+    for (let i = 0; i < batch.length; i += 100) {
+      await prisma.$transaction(batch.slice(i, i + 100));
+    }
     totalIndexed += files.length;
     logger.debug({ accountId, totalIndexed }, 'Indexed page');
   } while (pageToken);
