@@ -37,16 +37,20 @@ async function main(): Promise<void> {
   logger.info('BullMQ workers started');
 
   // Schedule periodic sync (every 30 minutes)
-  await syncQueue.add(
-    'periodicSync',
-    {},
-    {
-      repeat: { pattern: '*/30 * * * *' },
-      removeOnComplete: true,
-      removeOnFail: true,
-    },
-  );
-  logger.info('Periodic sync scheduled (every 30 min)');
+  try {
+    await syncQueue.add(
+      'periodicSync',
+      {},
+      {
+        repeat: { pattern: '*/30 * * * *' },
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+    );
+    logger.info('Periodic sync scheduled (every 30 min)');
+  } catch (err) {
+    logger.warn({ err }, 'Failed to schedule periodic sync — Redis may be rate-limited');
+  }
 
   app.listen(env.PORT, () => {
     logger.info({ port: env.PORT }, `Server running on ${env.APP_URL}`);
