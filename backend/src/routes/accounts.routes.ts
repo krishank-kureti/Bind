@@ -42,6 +42,7 @@ router.get('/:accountId/status', async (req: Request, res: Response, next: NextF
       return;
     }
 
+    res.set('Cache-Control', 'no-store');
     res.json({ success: true, data: account });
   } catch (err) {
     next(err);

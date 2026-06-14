@@ -190,6 +190,8 @@ export default function App() {
         const body = await res.json();
         const status = body.data?.syncStatus;
         if (status === 'SYNCED' || status === 'ERROR') return status;
+      } else if (res.status === 304) {
+        continue;
       }
     }
     return 'ERROR';
