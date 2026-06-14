@@ -56,11 +56,13 @@ router.post('/', upload.single('file'), async (req: Request, res: Response, next
       },
     });
 
-    logger.info({ jobId: uploadJob.id, accountId: bestAccount.id, fileName: req.file.originalname }, 'Processing upload synchronously (BullMQ bypass)');
+    logger.info({ jobId: uploadJob.id, accountId: bestAccount.id, fileName: req.file.originalname }, 'Upload started');
 
     await processUpload(uploadJob.id, req.file.path);
 
     const completedJob = await prisma.uploadJob.findUnique({ where: { id: uploadJob.id } });
+
+    logger.info({ jobId: uploadJob.id, status: completedJob?.status, resultFileId: completedJob?.resultFileId }, 'Upload completed');
 
     res.status(201).json({
       success: true,

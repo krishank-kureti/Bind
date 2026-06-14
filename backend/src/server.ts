@@ -3,22 +3,17 @@ import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
 import { prisma } from './config/prisma.js';
 import { existsSync, mkdirSync } from 'node:fs';
-import { createIndexWorker } from './workers/indexFiles.worker.js';
-import { createSyncWorker } from './workers/syncAccount.worker.js';
-import { createUploadWorker } from './workers/processUpload.worker.js';
-import { createDuplicateWorker } from './workers/duplicates.worker.js';
-import { createLazySyncWorker } from './workers/lazySync.worker.js';
+import { redis } from './config/redis.js';
 
 async function main(): Promise<void> {
   await prisma.$connect();
   logger.info('Database connected');
 
-  const { redis } = await import('./config/redis.js');
   try {
     await redis.ping();
     logger.info('Redis connected');
   } catch {
-    logger.warn('Redis not available — sessions and queues will not work');
+    logger.warn('Redis not available — sessions will not work');
   }
 
   // Ensure uploads directory exists
@@ -27,25 +22,12 @@ async function main(): Promise<void> {
     mkdirSync(uploadsDir);
   }
 
-  // Start BullMQ workers
-  const indexWorker = createIndexWorker();
-  const syncWorker = createSyncWorker();
-  const uploadWorker = createUploadWorker();
-  const duplicateWorker = createDuplicateWorker();
-  const lazySyncWorker = createLazySyncWorker();
-  logger.info('BullMQ workers started');
-
   app.listen(env.PORT, () => {
     logger.info({ port: env.PORT }, `Server running on ${env.APP_URL}`);
   });
 
   const shutdown = async () => {
     logger.info('Shutting down...');
-    await indexWorker.close();
-    await syncWorker.close();
-    await uploadWorker.close();
-    await duplicateWorker.close();
-    await lazySyncWorker.close();
     await prisma.$disconnect();
     redis.disconnect();
     process.exit(0);

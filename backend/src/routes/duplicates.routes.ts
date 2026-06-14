@@ -1,7 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { prisma } from '../config/prisma.js';
-import { duplicatesQueue } from '../workers/queue.js';
+import { scanDuplicates } from '../services/duplicates.service.js';
 import { permanentlyDeleteFile } from '../services/drive.service.js';
 import { logger } from '../utils/logger.js';
 
@@ -27,12 +27,13 @@ router.post('/scan', async (req: Request, res: Response, next: NextFunction) => 
   try {
     const userId = (req.user as Express.User).id;
 
-    await duplicatesQueue.add('scan', { userId }, {
-      removeOnComplete: true,
-      removeOnFail: true,
-    });
+    logger.info({ userId }, 'Duplicate scan started');
 
-    res.json({ success: true, data: { message: 'Duplicate scan queued' } });
+    const result = await scanDuplicates(userId);
+
+    logger.info({ userId, groupsCreated: result.groupsCreated, wasteBytes: result.wasteBytes.toString() }, 'Duplicate scan completed');
+
+    res.json({ success: true, data: { message: 'Duplicate scan completed', groupsCreated: result.groupsCreated, wasteBytes: result.wasteBytes.toString() } });
   } catch (err) {
     next(err);
   }

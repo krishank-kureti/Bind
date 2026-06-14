@@ -3,8 +3,7 @@ import { requireAuth } from '../middleware/auth.middleware.js';
 import { prisma } from '../config/prisma.js';
 import { redis } from '../config/redis.js';
 import { createHash } from 'node:crypto';
-import { lazySyncQueue, indexQueue } from '../workers/queue.js';
-import { incrementPendingSync } from '../services/lazySync.service.js';
+import { indexAccount } from '../services/index.service.js';
 import {
   downloadFile,
   uploadFile as driveUpload,
@@ -416,8 +415,6 @@ router.patch('/:fileId/rename', async (req: Request, res: Response, next: NextFu
       include: { account: accountSelect },
     });
 
-    await incrementPendingSync(userId, owned.account.id, lazySyncQueue).catch(() => {});
-
     res.json({ success: true, data: updated });
   } catch (err) {
     if (isPermissionError(err)) {
@@ -453,8 +450,6 @@ router.patch('/:fileId/move', async (req: Request, res: Response, next: NextFunc
       include: { account: accountSelect },
     });
 
-    await indexQueue.add('indexAccount', { accountId: owned.account.id }).catch(() => {});
-
     res.json({ success: true, data: updated });
   } catch (err) {
     if (isPermissionError(err)) {
@@ -485,8 +480,6 @@ router.patch('/:fileId/star', async (req: Request, res: Response, next: NextFunc
       include: { account: accountSelect },
     });
 
-    await incrementPendingSync(userId, owned.account.id, lazySyncQueue).catch(() => {});
-
     res.json({ success: true, data: updated });
   } catch (err) {
     if (isPermissionError(err)) {
@@ -515,7 +508,6 @@ router.post('/:fileId/trash', async (req: Request, res: Response, next: NextFunc
         data: { isTrashed: true },
         include: { account: accountSelect },
       });
-      await indexQueue.add('indexAccount', { accountId: owned.account.id }).catch(() => {});
       res.json({ success: true, data: updated });
     } else {
       await permanentlyDeleteFile(owned.account.id, owned.file.providerId);
@@ -616,8 +608,6 @@ router.post('/:fileId/copy', async (req: Request, res: Response, next: NextFunct
       include: { account: accountSelect },
     });
 
-    await incrementPendingSync(userId, owned.account.id, lazySyncQueue).catch(() => {});
-
     res.status(201).json({ success: true, data: fileIndex });
   } catch (err) {
     if (isPermissionError(err)) {
@@ -679,9 +669,6 @@ router.post('/:fileId/move-across', async (req: Request, res: Response, next: Ne
     });
 
     await prisma.fileIndex.delete({ where: { id: fileId } });
-
-    await indexQueue.add('indexAccount', { accountId: owned.account.id }).catch(() => {});
-    await indexQueue.add('indexAccount', { accountId: targetAccount.id }).catch(() => {});
 
     res.json({ success: true, data: fileIndex });
   } catch (err) {

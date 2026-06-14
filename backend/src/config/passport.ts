@@ -3,7 +3,8 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { prisma } from './prisma.js';
 import { env } from './env.js';
 import { encrypt } from '../utils/encryption.js';
-import { indexQueue } from '../workers/queue.js';
+import { indexAccount } from '../services/index.service.js';
+import { logger } from '../utils/logger.js';
 
 passport.serializeUser((user: Express.User, done) => {
   done(null, user.id);
@@ -66,7 +67,8 @@ passport.use(new GoogleStrategy({
             isActive: true,
           },
         });
-        await indexQueue.add('indexAccount', { accountId: existing.id });
+        logger.info({ accountId: existing.id }, 'Indexing account after re-auth');
+        indexAccount(existing.id).catch((err) => logger.error({ accountId: existing.id, err }, 'Index failed after re-auth'));
       } else {
         const newAccount = await prisma.connectedAccount.create({
           data: {
@@ -82,7 +84,8 @@ passport.use(new GoogleStrategy({
             scopes: ['drive'],
           },
         });
-        await indexQueue.add('indexAccount', { accountId: newAccount.id });
+        logger.info({ accountId: newAccount.id }, 'Indexing new account');
+        indexAccount(newAccount.id).catch((err) => logger.error({ accountId: newAccount.id, err }, 'Index failed for new account'));
       }
 
       done(null, req.user);
@@ -103,7 +106,8 @@ passport.use(new GoogleStrategy({
           tokenExpiresAt,
         },
       });
-      await indexQueue.add('indexAccount', { accountId: existingAccount.id });
+      logger.info({ accountId: existingAccount.id }, 'Indexing existing account after re-auth');
+      indexAccount(existingAccount.id).catch((err) => logger.error({ accountId: existingAccount.id, err }, 'Index failed for existing account'));
       done(null, existingAccount.user);
       return;
     }
@@ -132,7 +136,8 @@ passport.use(new GoogleStrategy({
       },
     });
 
-    await indexQueue.add('indexAccount', { accountId: newAccount.id });
+    logger.info({ accountId: newAccount.id }, 'Indexing newly created account');
+    indexAccount(newAccount.id).catch((err) => logger.error({ accountId: newAccount.id, err }, 'Index failed for new account'));
     done(null, user);
   } catch (err) {
     done(err);

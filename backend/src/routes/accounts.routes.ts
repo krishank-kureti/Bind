@@ -1,8 +1,9 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { getUserAccounts } from '../services/auth.service.js';
-import { indexQueue } from '../workers/queue.js';
+import { indexAccount } from '../services/index.service.js';
 import { prisma } from '../config/prisma.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -92,7 +93,7 @@ router.post('/:accountId/sync', async (req: Request, res: Response, next: NextFu
       return;
     }
 
-    if (account.syncStatus === 'PENDING' || account.syncStatus === 'SYNCING') {
+    if (account.syncStatus === 'SYNCING') {
       res.json({
         success: true,
         data: { id: account.id, syncStatus: account.syncStatus, message: 'Sync already in progress' },
@@ -102,16 +103,30 @@ router.post('/:accountId/sync', async (req: Request, res: Response, next: NextFu
 
     await prisma.connectedAccount.update({
       where: { id: account.id },
-      data: { syncStatus: 'PENDING' },
+      data: { syncStatus: 'SYNCING' },
     });
 
-    await indexQueue.add('indexAccount', { accountId: account.id }, { jobId: `sync-${account.id}` });
+    logger.info({ accountId }, 'Sync started');
+
+    const totalIndexed = await indexAccount(accountId);
+
+    await prisma.connectedAccount.update({
+      where: { id: account.id },
+      data: { syncStatus: 'SYNCED', lastSyncedAt: new Date() },
+    });
+
+    logger.info({ accountId, totalIndexed }, 'Sync completed');
 
     res.json({
       success: true,
-      data: { id: account.id, syncStatus: 'PENDING', message: 'Sync queued' },
+      data: { id: account.id, syncStatus: 'SYNCED', totalIndexed },
     });
   } catch (err) {
+    const accountId = req.params.accountId as string;
+    await prisma.connectedAccount.update({
+      where: { id: accountId },
+      data: { syncStatus: 'ERROR' },
+    }).catch(() => {});
     next(err);
   }
 });

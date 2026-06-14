@@ -72,50 +72,13 @@ export function UploadModal({ isOpen, onClose, accounts }: UploadModalProps) {
   const [files, setFiles] = useState<UploadFileEntry[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const pollTimers = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
 
   useEffect(() => {
     if (!isOpen) {
       setFiles([]);
       setUploading(false);
-      pollTimers.current.forEach((t) => clearInterval(t));
-      pollTimers.current.clear();
     }
   }, [isOpen]);
-
-  const stopPolling = useCallback((id: string) => {
-    const t = pollTimers.current.get(id);
-    if (t) {
-      clearInterval(t);
-      pollTimers.current.delete(id);
-    }
-  }, []);
-
-  const pollJobStatus = useCallback((entryId: string, jobId: string) => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await apiFetch(`/api/upload/${jobId}`);
-        if (res.ok) {
-          const body = await res.json();
-          const job = body.data;
-          setFiles((prev) =>
-            prev.map((f) =>
-              f.id === entryId
-                ? { ...f, progress: job.progress ?? f.progress, status: job.status === 'COMPLETE' ? 'success' as const : job.status === 'FAILED' ? 'failed' as const : 'uploading' as const, errorMessage: job.errorMessage ?? undefined }
-                : f,
-            ),
-          );
-          if (job.status === 'COMPLETE' || job.status === 'FAILED') {
-            stopPolling(entryId);
-            checkAllDone();
-          }
-        }
-      } catch {
-        stopPolling(entryId);
-      }
-    }, 2000);
-    pollTimers.current.set(entryId, interval);
-  }, [stopPolling]);
 
   const checkAllDone = useCallback(() => {
     setFiles((prev) => {
@@ -160,11 +123,15 @@ export function UploadModal({ isOpen, onClose, accounts }: UploadModalProps) {
         const res = await apiFetch('/api/upload', { method: 'POST', body: formData });
         if (res.ok) {
           const body = await res.json();
-          const jobId = body.data.id;
+          const result = body.data;
           setFiles((prev) =>
-            prev.map((f) => (f.id === entry.id ? { ...f, jobId, progress: 5, status: 'uploading' as const } : f)),
+            prev.map((f) =>
+              f.id === entry.id
+                ? { ...f, progress: result.status === 'COMPLETE' ? 100 : 0, status: result.status === 'COMPLETE' ? 'success' as const : result.status === 'FAILED' ? 'failed' as const : 'uploading' as const, errorMessage: result.errorMessage ?? undefined }
+                : f,
+            ),
           );
-          pollJobStatus(entry.id, jobId);
+          checkAllDone();
         } else {
           const body = await res.json();
           setFiles((prev) =>
@@ -177,7 +144,7 @@ export function UploadModal({ isOpen, onClose, accounts }: UploadModalProps) {
         );
       }
     }
-  }, [files, pollJobStatus]);
+  }, [files]);
 
   const removeFile = useCallback((id: string) => {
     stopPolling(id);

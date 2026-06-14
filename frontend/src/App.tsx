@@ -182,19 +182,16 @@ export default function App() {
   };
 
   const handleSyncAccount = async (accountId: string): Promise<'SYNCED' | 'ERROR'> => {
-    await apiFetch(`/api/accounts/${accountId}/sync`, { method: 'POST' });
-    for (let i = 0; i < 90; i++) {
-      await new Promise((r) => setTimeout(r, 2000));
-      const res = await apiFetch(`/api/accounts/${accountId}/status`);
+    try {
+      const res = await apiFetch(`/api/accounts/${accountId}/sync`, { method: 'POST' });
       if (res.ok) {
         const body = await res.json();
-        const status = body.data?.syncStatus;
-        if (status === 'SYNCED' || status === 'ERROR') return status;
-      } else if (res.status === 304) {
-        continue;
+        return body.data?.syncStatus === 'SYNCED' ? 'SYNCED' : 'ERROR';
       }
+      return 'ERROR';
+    } catch {
+      return 'ERROR';
     }
-    return 'ERROR';
   };
 
   const handleSyncAllAccounts = async () => {
