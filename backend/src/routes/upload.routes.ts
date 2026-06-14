@@ -6,7 +6,7 @@ import { requireAuth } from '../middleware/auth.middleware.js';
 import { prisma } from '../config/prisma.js';
 import { selectBestAccountForUpload } from '../services/storage.service.js';
 import { downloadFile } from '../services/drive.service.js';
-import { uploadQueue } from '../workers/queue.js';
+import { processUpload } from '../services/upload.service.js';
 import { logger } from '../utils/logger.js';
 
 const uploadDir = path.resolve('uploads');
@@ -56,20 +56,21 @@ router.post('/', upload.single('file'), async (req: Request, res: Response, next
       },
     });
 
-    await uploadQueue.add('processUpload', {
-      jobId: uploadJob.id,
-      tempPath: req.file.path,
-    });
+    logger.info({ jobId: uploadJob.id, accountId: bestAccount.id, fileName: req.file.originalname }, 'Processing upload synchronously (BullMQ bypass)');
 
-    logger.info({ jobId: uploadJob.id, accountId: bestAccount.id, fileName: req.file.originalname }, 'Upload queued');
+    await processUpload(uploadJob.id, req.file.path);
+
+    const completedJob = await prisma.uploadJob.findUnique({ where: { id: uploadJob.id } });
 
     res.status(201).json({
       success: true,
       data: {
         id: uploadJob.id,
-        status: 'PENDING',
+        status: completedJob?.status ?? 'UNKNOWN',
         fileName: req.file.originalname,
         fileSize: req.file.size,
+        resultFileId: completedJob?.resultFileId ?? null,
+        errorMessage: completedJob?.errorMessage ?? null,
       },
     });
   } catch (err) {
