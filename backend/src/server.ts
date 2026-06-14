@@ -3,7 +3,6 @@ import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
 import { prisma } from './config/prisma.js';
 import { existsSync, mkdirSync } from 'node:fs';
-import { syncQueue } from './workers/queue.js';
 import { createIndexWorker } from './workers/indexFiles.worker.js';
 import { createSyncWorker } from './workers/syncAccount.worker.js';
 import { createUploadWorker } from './workers/processUpload.worker.js';
@@ -35,22 +34,6 @@ async function main(): Promise<void> {
   const duplicateWorker = createDuplicateWorker();
   const lazySyncWorker = createLazySyncWorker();
   logger.info('BullMQ workers started');
-
-  // Schedule periodic sync (every 30 minutes)
-  try {
-    await syncQueue.add(
-      'periodicSync',
-      {},
-      {
-        repeat: { pattern: '*/30 * * * *' },
-        removeOnComplete: true,
-        removeOnFail: true,
-      },
-    );
-    logger.info('Periodic sync scheduled (every 30 min)');
-  } catch (err) {
-    logger.warn({ err }, 'Failed to schedule periodic sync — Redis may be rate-limited');
-  }
 
   app.listen(env.PORT, () => {
     logger.info({ port: env.PORT }, `Server running on ${env.APP_URL}`);

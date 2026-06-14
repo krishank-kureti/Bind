@@ -17,6 +17,8 @@ export function createDuplicateWorker(): Worker {
     connection,
     concurrency: 1,
     limiter: { max: 1, duration: 10000 },
+    drainDelay: 10000,
+    stalledInterval: 60000,
   });
 
   worker.on('failed', (job, err) => {

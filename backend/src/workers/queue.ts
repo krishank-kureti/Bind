@@ -9,8 +9,8 @@ export const indexQueue = new Queue('index-queue', {
   defaultJobOptions: {
     attempts: 3,
     backoff: { type: 'exponential', delay: 5000 },
-    removeOnComplete: 100,
-    removeOnFail: 50,
+    removeOnComplete: true,
+    removeOnFail: true,
   },
 });
 
@@ -19,8 +19,8 @@ export const syncQueue = new Queue('sync-queue', {
   defaultJobOptions: {
     attempts: 2,
     backoff: { type: 'fixed', delay: 10000 },
-    removeOnComplete: 50,
-    removeOnFail: 20,
+    removeOnComplete: true,
+    removeOnFail: true,
   },
 });
 
@@ -29,8 +29,8 @@ export const uploadQueue = new Queue('upload-queue', {
   defaultJobOptions: {
     attempts: 3,
     backoff: { type: 'exponential', delay: 5000 },
-    removeOnComplete: 50,
-    removeOnFail: 10,
+    removeOnComplete: true,
+    removeOnFail: true,
   },
 });
 
@@ -39,8 +39,8 @@ export const duplicatesQueue = new Queue('duplicates-queue', {
   defaultJobOptions: {
     attempts: 2,
     backoff: { type: 'fixed', delay: 10000 },
-    removeOnComplete: 50,
-    removeOnFail: 20,
+    removeOnComplete: true,
+    removeOnFail: true,
   },
 });
 

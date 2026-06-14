@@ -33,7 +33,11 @@ export function createIndexWorker(): Worker {
       logger.error({ accountId, error, jobId: job.id }, 'Index job failed');
       throw error;
     }
-  }, { connection: redis as any });
+  }, {
+    connection: redis as any,
+    drainDelay: 10000,
+    stalledInterval: 60000,
+  });
 
   worker.on('error', (err) => {
     logger.error({ err }, 'Index worker error');

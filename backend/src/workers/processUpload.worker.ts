@@ -16,7 +16,9 @@ export function createUploadWorker(): Worker {
     },
     {
       connection,
-      concurrency: 3,
+      concurrency: 1,
+      drainDelay: 10000,
+      stalledInterval: 60000,
     },
   );
 

@@ -92,12 +92,20 @@ router.post('/:accountId/sync', async (req: Request, res: Response, next: NextFu
       return;
     }
 
+    if (account.syncStatus === 'PENDING' || account.syncStatus === 'SYNCING') {
+      res.json({
+        success: true,
+        data: { id: account.id, syncStatus: account.syncStatus, message: 'Sync already in progress' },
+      });
+      return;
+    }
+
     await prisma.connectedAccount.update({
       where: { id: account.id },
       data: { syncStatus: 'PENDING' },
     });
 
-    await indexQueue.add('indexAccount', { accountId: account.id });
+    await indexQueue.add('indexAccount', { accountId: account.id }, { jobId: `sync-${account.id}` });
 
     res.json({
       success: true,

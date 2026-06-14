@@ -22,7 +22,12 @@ export function createLazySyncWorker(): Worker {
     await clearPendingSync(userId);
     logger.info({ userId, accountCount: accountIds.length }, 'Lazy sync batch complete');
     return { syncedAccounts: accountIds.length };
-  }, { connection: redis as any, concurrency: 1 });
+  }, {
+    connection: redis as any,
+    concurrency: 1,
+    drainDelay: 10000,
+    stalledInterval: 60000,
+  });
 
   worker.on('failed', (job, err) => {
     logger.error({ jobId: job?.id, err }, 'Lazy sync job failed');

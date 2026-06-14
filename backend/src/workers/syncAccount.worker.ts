@@ -19,7 +19,11 @@ export function createSyncWorker(): Worker {
 
     logger.info({ accountCount: accounts.length }, 'Periodic sync queued');
     return { queuedAccounts: accounts.length };
-  }, { connection: redis as any });
+  }, {
+    connection: redis as any,
+    drainDelay: 10000,
+    stalledInterval: 60000,
+  });
 
   worker.on('error', (err) => {
     logger.error({ err }, 'Sync worker error');
