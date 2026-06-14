@@ -147,9 +147,8 @@ export function UploadModal({ isOpen, onClose, accounts }: UploadModalProps) {
   }, [files]);
 
   const removeFile = useCallback((id: string) => {
-    stopPolling(id);
     setFiles((prev) => prev.filter((f) => f.id !== id));
-  }, [stopPolling]);
+  }, []);
 
   const totalQuota = accounts.reduce((s, a) => s + a.quotaTotal, 0);
   const totalUsed = accounts.reduce((s, a) => s + a.quotaUsed, 0);
