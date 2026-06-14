@@ -113,7 +113,7 @@ export function UploadModal({ isOpen, onClose, accounts }: UploadModalProps) {
       } catch {
         stopPolling(entryId);
       }
-    }, 400);
+    }, 2000);
     pollTimers.current.set(entryId, interval);
   }, [stopPolling]);
 
