@@ -19,7 +19,7 @@ function buildUpsertPayload(file: any, accountId: string) {
     thumbnailLink: file.thumbnailLink ?? null,
     iconLink: file.iconLink ?? null,
     starred: file.starred ?? false,
-    isOwned: file.owners?.some((o) => o.me === true) ?? true,
+    isOwned: file.owners?.some((o: { me?: boolean }) => o.me === true) ?? true,
     md5Checksum: file.md5Checksum ?? null,
   };
 
