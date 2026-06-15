@@ -5,6 +5,15 @@ import { env } from '../config/env.js';
 
 const router = Router();
 
+function noCache(req: unknown, res: { set: (key: string, value: string) => void; removeHeader: (key: string) => void }, next: () => void) {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('Surrogate-Control', 'no-store');
+  res.removeHeader('ETag');
+  next();
+}
+
 router.get('/google', passport.authenticate('google', {
   scope: [
     'openid',
@@ -17,11 +26,11 @@ router.get('/google', passport.authenticate('google', {
 }));
 
 router.get('/google/callback', passport.authenticate('google', {
-  successRedirect: `${env.FRONTEND_URL}/`,
+  successRedirect: `${env.FRONTEND_URL}/auth/success`,
   failureRedirect: `${env.FRONTEND_URL}/?error=auth_failed`,
 }));
 
-router.post('/logout', (req, res, next) => {
+router.post('/logout', noCache, (req, res, next) => {
   req.logout((err) => {
     if (err) {
       next(err);
@@ -34,7 +43,7 @@ router.post('/logout', (req, res, next) => {
   });
 });
 
-router.get('/me', async (req, res, next) => {
+router.get('/me', noCache, async (req, res, next) => {
   if (!req.isAuthenticated()) {
     res.status(200).json({
       success: true,

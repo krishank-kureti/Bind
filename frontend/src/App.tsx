@@ -100,10 +100,41 @@ export default function App() {
     setLoading(false);
   };
 
-  useEffect(() => { checkAuth(); }, []);
+  useEffect(() => {
+    const isAuthSuccess = window.location.pathname === '/auth/success';
+    if (isAuthSuccess) {
+      let attempts = 0;
+      const maxAttempts = 10;
+      const poll = setInterval(async () => {
+        attempts++;
+        try {
+          const res = await apiFetch('/api/auth/me');
+          if (res.ok) {
+            const body = await res.json();
+            if (body.data?.user) {
+              clearInterval(poll);
+              window.history.replaceState(null, '', '/');
+              setIsAuthenticated(true);
+              await fetchAllData();
+              return;
+            }
+          }
+        } catch {
+          // retry
+        }
+        if (attempts >= maxAttempts) {
+          clearInterval(poll);
+          window.location.href = '/';
+        }
+      }, 1000);
+      return () => clearInterval(poll);
+    } else {
+      checkAuth();
+    }
+  }, []);
 
   useEffect(() => {
-    if (authChecked && !isAuthenticated && !loading && !splashDone) {
+    if (authChecked && !isAuthenticated && !loading && !splashDone && window.location.pathname !== '/auth/success') {
       const startTime = Date.now();
       const duration = 3000;
       const interval = setInterval(() => {
@@ -257,6 +288,26 @@ export default function App() {
       alert(body.error?.message || 'Failed to disconnect');
     }
   };
+
+  if (window.location.pathname === '/auth/success' && !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-8">
+        <div className="max-w-lg w-full text-center space-y-12">
+          <div>
+            <div className="w-20 h-20 border-4 border-black bg-black flex items-center justify-center text-white shadow-[8px_8px_0px_0px_#3b82f6] mx-auto mb-8">
+              <Cloud className="w-10 h-10" />
+            </div>
+            <h1 className="font-black text-7xl text-black tracking-[0.15em] uppercase mb-4">BIND</h1>
+            <p className="text-sm text-slate-400 font-bold uppercase tracking-widest font-mono">Unified CloudVault Storage Router</p>
+          </div>
+          <div className="flex flex-col items-center gap-4">
+            <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
+            <p className="text-xs text-slate-500 font-mono font-bold uppercase tracking-wider">Authenticating your account...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (authChecked && !isAuthenticated && !loading) {
     if (!splashDone) {
