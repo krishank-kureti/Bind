@@ -6,7 +6,7 @@ import { env } from '../config/env.js';
 const router = Router();
 
 function noCache(req: unknown, res: { set: (key: string, value: string) => void; removeHeader: (key: string) => void }, next: () => void) {
-  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   res.set('Pragma', 'no-cache');
   res.set('Expires', '0');
   res.set('Surrogate-Control', 'no-store');
@@ -26,7 +26,7 @@ router.get('/google', passport.authenticate('google', {
 }));
 
 router.get('/google/callback', passport.authenticate('google', {
-  successRedirect: `${env.FRONTEND_URL}/auth/success`,
+  successRedirect: `${env.FRONTEND_URL}/`,
   failureRedirect: `${env.FRONTEND_URL}/?error=auth_failed`,
 }));
 
