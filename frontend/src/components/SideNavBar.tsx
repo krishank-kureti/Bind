@@ -1,12 +1,22 @@
 import React from "react";
 import { LayoutDashboard, FolderOpen, Brain, CreditCard, Plus, Settings, HelpCircle, Cloud, LogOut } from "lucide-react";
+import { CloudAccount } from "../types";
 
 interface SideNavBarProps {
   currentTab: string;
   setCurrentTab: (tab: string) => void;
   onOpenConnectModal: () => void;
   accountsCount: number;
+  accounts: CloudAccount[];
   onLogout: () => void;
+}
+
+function formatBytes(bytes: number, decimals = 1): string {
+  if (!bytes || bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) + " " + sizes[i];
 }
 
 const navItems = [
@@ -21,7 +31,13 @@ const footerItems = [
   { id: "support", label: "Support", icon: HelpCircle },
 ];
 
-export default function SideNavBar({ currentTab, setCurrentTab, onOpenConnectModal, accountsCount, onLogout }: SideNavBarProps) {
+export default function SideNavBar({ currentTab, setCurrentTab, onOpenConnectModal, accountsCount, accounts, onLogout }: SideNavBarProps) {
+  const totalUsed = (accounts || []).reduce((sum, a) => sum + (a.quotaUsed || 0), 0);
+  const totalQuota = (accounts || []).reduce((sum, a) => sum + (a.quotaTotal || 0), 0);
+  const usagePercent = totalQuota > 0 ? Math.min(100, Math.round((totalUsed / totalQuota) * 100)) : 0;
+  const usedLabel = formatBytes(totalUsed);
+  const totalLabel = formatBytes(totalQuota);
+
   return (
     <aside className="w-64 border-r-2 border-black bg-white flex flex-col h-screen fixed left-0 top-0 z-20">
       <div className="p-6 flex items-center gap-3 border-b-2 border-black bg-slate-50">
@@ -66,11 +82,15 @@ export default function SideNavBar({ currentTab, setCurrentTab, onOpenConnectMod
       </nav>
 
       <div className="p-4 border-t border-black bg-slate-50">
-        <div className="px-1 mb-2">
-          <span className="text-[9px] font-extrabold text-slate-400 tracking-widest uppercase block">Global Grid Storage</span>
+        <div className="px-1 mb-1 flex items-center justify-between">
+          <span className="text-[9px] font-extrabold text-slate-400 tracking-widest uppercase">Global Grid Storage</span>
+          <span className="text-[8px] font-mono font-bold text-slate-500">{usagePercent}%</span>
         </div>
-        <div className="border border-black h-5 w-full bg-slate-200 overflow-hidden relative">
-          <div className="h-full geo-stripes" style={{ width: "65%" }} />
+        <div className="border border-black h-4 w-full bg-slate-200 overflow-hidden relative" title={`${usedLabel} / ${totalLabel}`}>
+          <div className="h-full geo-stripes" style={{ width: `${usagePercent}%` }} />
+        </div>
+        <div className="text-[7px] font-mono text-right text-slate-400 mt-0.5 tracking-tighter" title="Combined across connected accounts">
+          {usedLabel} / {totalLabel}
         </div>
       </div>
 
