@@ -310,6 +310,10 @@ export default function App() {
     );
   }
 
+  if (!authChecked) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 flex">
       <SideNavBar currentTab={currentTab} setCurrentTab={setCurrentTab} onOpenConnectModal={() => setIsConnectOpen(true)} accountsCount={accounts.length} accounts={accounts} onLogout={handleLogout} />
