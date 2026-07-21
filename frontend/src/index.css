@@ -195,29 +195,33 @@
 
 html, body, #root {
   font-family: var(--font-sans);
-  font-style: italic;
+  /*
+   * Mild slant instead of true italic faces (~12–14°).
+   * oblique 6deg keeps a soft tilt without the heavy italic lean.
+   */
+  font-style: oblique 6deg;
   -webkit-font-smoothing: antialiased;
   text-transform: none;
   letter-spacing: normal;
 }
 
 /*
- * ~5% larger type throughout. The UI uses many absolute text-[Npx] sizes,
- * so zoom scales those (and rem sizes) evenly without editing every class.
+ * Type scale: 1.05 (prior) × 1.05 (this pass) ≈ +10% vs original.
+ * Zoom covers absolute text-[Npx] sizes used across the app.
  */
 #root {
-  zoom: 1.05;
+  zoom: 1.1025;
 }
 
 /* Display titles use Headline cut */
 h1, h2, .font-display {
   font-family: var(--font-display);
-  font-style: italic;
+  font-style: oblique 6deg;
 }
 
 /* Form controls don't always inherit font-style from body */
 button, input, select, textarea, label, a {
-  font-style: italic;
+  font-style: oblique 6deg;
 }
 
 /* Never force all-caps anywhere in the app */
@@ -249,7 +253,7 @@ button, input, select, textarea, label, a {
   border: 1px solid #000000;
   border-radius: 0px !important;
   font-weight: 700;
-  font-style: italic;
+  font-style: oblique 6deg;
   letter-spacing: 0.01em;
   font-size: 12px;
   height: 40px;
@@ -278,7 +282,7 @@ button, input, select, textarea, label, a {
   border: 1px solid #000000;
   border-radius: 0px !important;
   font-weight: 700;
-  font-style: italic;
+  font-style: oblique 6deg;
   letter-spacing: 0.01em;
   font-size: 12px;
   height: 40px;
@@ -321,7 +325,7 @@ button, input, select, textarea, label, a {
   background-color: #000000;
   color: #ffffff;
   font-weight: 700;
-  font-style: italic;
+  font-style: oblique 6deg;
   font-size: 11px;
   padding: 4px 12px;
   border-radius: 0px !important;
@@ -333,7 +337,7 @@ button, input, select, textarea, label, a {
   color: #000000;
   border: 1.5px solid #000000;
   font-weight: 700;
-  font-style: italic;
+  font-style: oblique 6deg;
   font-size: 11px;
   padding: 4px 12px;
   border-radius: 0px !important;
