@@ -13,11 +13,12 @@ interface DashboardViewProps {
 }
 
 function formatBytes(bytes: number, decimals = 1): string {
-  if (bytes === 0) return "0 B";
+  if (!bytes || bytes === 0) return "0 B";
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) + " " + sizes[i];
+  const i = Math.min(sizes.length - 1, Math.floor(Math.log(Math.abs(bytes)) / Math.log(k)));
+  // Keep fixed decimals so 1.85 + 8.84 reads correctly (not rounded to 2 + 9)
+  return `${(bytes / Math.pow(k, i)).toFixed(decimals)} ${sizes[i]}`;
 }
 
 const GIB = 1024 ** 3; // same base as formatBytes (binary GB)
@@ -121,8 +122,10 @@ export default function DashboardView({ accounts, files, onOpenUploadModal, isSy
                   <span className="block h-full transition-all" style={{ width: `${pct}%`, backgroundColor: a.color }} />
                 </div>
                 <div className="flex justify-between text-[10px] font-semibold ">
-                  <span className="text-slate-500">{formatBytes(a.quotaUsed, 0)} / {formatBytes(a.quotaTotal, 0)}</span>
-                  <span className={pct > 90 ? 'text-red-600' : 'text-black'}>{pct.toFixed(0)}%</span>
+                  <span className="text-slate-500" title={`${a.quotaUsed} / ${a.quotaTotal} bytes`}>
+                    {formatBytes(a.quotaUsed, 2)} / {formatBytes(a.quotaTotal, 2)}
+                  </span>
+                  <span className={pct > 90 ? 'text-red-600' : 'text-black'}>{pct.toFixed(1)}%</span>
                 </div>
               </div>
             );
