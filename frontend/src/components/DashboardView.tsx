@@ -20,9 +20,14 @@ function formatBytes(bytes: number, decimals = 1): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) + " " + sizes[i];
 }
 
+const GIB = 1024 ** 3; // same base as formatBytes (binary GB)
+
 export default function DashboardView({ accounts, files, onOpenUploadModal, isSyncing, onRefreshStorage, onNavigateIntelligence, onSyncAccounts }: DashboardViewProps) {
-  const totalQuota = accounts.reduce((s, a) => s + a.quotaTotal, 0);
-  const totalUsed = accounts.reduce((s, a) => s + a.quotaUsed, 0);
+  // Must match SideNavBar Global Grid Storage: sum of per-account quota fields
+  const totalQuota = accounts.reduce((s, a) => s + (a.quotaTotal || 0), 0);
+  const totalUsed = accounts.reduce((s, a) => s + (a.quotaUsed || 0), 0);
+  const usedGiB = totalUsed / GIB;
+  const quotaGiB = totalQuota / GIB;
   const activeCount = accounts.filter((a) => a.syncStatus === 'SYNCED').length;
 
   const duplicateSizes: Record<string, number> = {};
@@ -69,9 +74,9 @@ export default function DashboardView({ accounts, files, onOpenUploadModal, isSy
           </button>
         </div>
         <div className="flex items-baseline gap-2 mb-4">
-          <span className="text-4xl font-black text-black tracking-tighter">{(totalUsed / 1e9).toFixed(2)}</span>
+          <span className="text-4xl font-black text-black tracking-tighter">{usedGiB.toFixed(2)}</span>
           <span className="text-[11px] font-semibold text-black tracking-normal">GB Consolidated</span>
-          <span className="text-[11px] text-slate-500 font-mono font-bold ml-auto ">Cap: {(totalQuota / 1e9).toFixed(1)} GB</span>
+          <span className="text-[11px] text-slate-500 font-mono font-bold ml-auto ">Cap: {quotaGiB.toFixed(1)} GB</span>
         </div>
         <div className="h-6 w-full bg-slate-100 border-2 border-black flex overflow-hidden mb-4">
           {accounts.map((a) => {
