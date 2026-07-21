@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "render": {
+      "command": "node",
+      "args": [
+        "/Users/krishankkureti/Documents/Projects/BIND/.opencode/mcp/render-server.js"
+      ],
+      "env": {}
+    }
+  }
+}
