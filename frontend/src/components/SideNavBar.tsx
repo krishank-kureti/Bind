@@ -45,14 +45,14 @@ export default function SideNavBar({ currentTab, setCurrentTab, onOpenConnectMod
           <Cloud className="w-5 h-5" />
         </div>
         <div>
-          <h1 className="font-black text-2xl text-black tracking-widest leading-none uppercase">BIND</h1>
-          <p className="text-[9px] text-slate-500 font-black tracking-widest font-mono uppercase mt-1">Unified CloudVault</p>
+          <h1 className="font-black text-2xl text-black tracking-normal leading-none ">BIND</h1>
+          <p className="text-[9px] text-slate-500 font-bold tracking-normal mt-1">Unified CloudVault</p>
         </div>
       </div>
 
       <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto bg-white">
         <div className="px-2 mb-3">
-          <span className="text-[10px] font-extrabold text-slate-400 tracking-widest uppercase">Navigation</span>
+          <span className="text-[10px] font-semibold text-slate-400 tracking-normal ">Navigation</span>
         </div>
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -61,11 +61,11 @@ export default function SideNavBar({ currentTab, setCurrentTab, onOpenConnectMod
             <button
               key={item.id}
               onClick={() => setCurrentTab(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-none text-[12px] font-extrabold tracking-wide uppercase border transition-all duration-100 cursor-pointer ${
-                isActive
-                  ? "bg-black text-white border-black shadow-[3px_3px_0px_0px_#3b82f6]"
-                  : "text-slate-600 border-transparent hover:border-black hover:bg-slate-50"
-              }`}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-none text-[12px] font-extrabold tracking-normal border transition-all duration-100 cursor-pointer ${
+ isActive
+ ? "bg-black text-white border-black shadow-[3px_3px_0px_0px_#3b82f6]"
+ : "text-slate-600 border-transparent hover:border-black hover:bg-slate-50"
+ }`}
             >
               <Icon className={`w-4 h-4 ${isActive ? "text-[#3b82f6]" : "text-slate-500"}`} />
               <span className="flex-1 text-left">{item.label}</span>
@@ -83,13 +83,13 @@ export default function SideNavBar({ currentTab, setCurrentTab, onOpenConnectMod
 
       <div className="p-4 border-t border-black bg-slate-50">
         <div className="px-1 mb-1 flex items-center justify-between">
-          <span className="text-[9px] font-extrabold text-slate-400 tracking-widest uppercase">Global Grid Storage</span>
+          <span className="text-[9px] font-semibold text-slate-400 tracking-normal ">Global Grid Storage</span>
           <span className="text-[8px] font-mono font-bold text-slate-500">{usagePercent}%</span>
         </div>
         <div className="border border-black h-4 w-full bg-slate-200 overflow-hidden relative" title={`${usedLabel} / ${totalLabel}`}>
           <div className="h-full geo-stripes" style={{ width: `${usagePercent}%` }} />
         </div>
-        <div className="text-[7px] font-mono text-right text-slate-400 mt-0.5 tracking-tighter" title="Combined across connected accounts">
+        <div className="text-[7px] text-right text-slate-400 mt-0.5 tracking-tighter" title="Combined across connected accounts">
           {usedLabel} / {totalLabel}
         </div>
       </div>
@@ -103,9 +103,9 @@ export default function SideNavBar({ currentTab, setCurrentTab, onOpenConnectMod
               <li key={item.id}>
                 <button
                   onClick={() => setCurrentTab(item.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-2 rounded-none text-[11px] font-bold uppercase tracking-wider border transition-all cursor-pointer ${
-                    isActive ? "bg-black text-white border-black" : "text-slate-600 border-transparent hover:border-black hover:bg-white"
-                  }`}
+                  className={`w-full flex items-center gap-3 px-4 py-2 rounded-none text-[11px] font-bold tracking-normal border transition-all cursor-pointer ${
+ isActive ? "bg-black text-white border-black" : "text-slate-600 border-transparent hover:border-black hover:bg-white"
+ }`}
                 >
                   <Icon className="w-4 h-4" /> <span>{item.label}</span>
                 </button>
@@ -113,7 +113,7 @@ export default function SideNavBar({ currentTab, setCurrentTab, onOpenConnectMod
             );
           })}
         </ul>
-        <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-2 rounded-none text-[11px] font-bold uppercase tracking-wider border border-transparent text-red-500 hover:border-red-400 hover:bg-red-50 transition-all cursor-pointer">
+        <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-2 rounded-none text-[11px] font-bold tracking-normal border border-transparent text-red-500 hover:border-red-400 hover:bg-red-50 transition-all cursor-pointer">
           <LogOut className="w-4 h-4" /> <span>Logout</span>
         </button>
       </div>

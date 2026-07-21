@@ -47,13 +47,13 @@ export default function SupportView() {
     <div className="space-y-6 max-w-3xl mx-auto pb-12">
       <div className="flex items-center gap-3">
         <HelpCircle className="w-5 h-5 text-black" />
-        <h2 className="font-black text-black text-lg uppercase tracking-wider">Support</h2>
+        <h2 className="font-black text-black text-lg tracking-normal">Support</h2>
       </div>
 
       <div className="bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] overflow-hidden">
         <div className="bg-black text-white px-6 py-3 flex items-center gap-3">
           <HelpCircle className="w-4 h-4 text-blue-400" />
-          <h3 className="font-extrabold text-[11px] uppercase tracking-widest">Frequently Asked Questions</h3>
+          <h3 className="font-semibold text-[11px] tracking-normal">Frequently Asked Questions</h3>
         </div>
         <div className="divide-y divide-black">
           {faqs.map((faq, i) => (
@@ -64,7 +64,7 @@ export default function SupportView() {
               </button>
               {openFaq === i && (
                 <div className="px-6 pb-4">
-                  <p className="text-[12px] text-slate-600 font-mono font-medium leading-relaxed">{faq.a}</p>
+                  <p className="text-[12px] text-slate-600 font-medium leading-relaxed">{faq.a}</p>
                 </div>
               )}
             </div>
@@ -75,23 +75,23 @@ export default function SupportView() {
       <div className="bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] overflow-hidden">
         <div className="bg-black text-white px-6 py-3 flex items-center gap-3">
           <Bug className="w-4 h-4 text-blue-400" />
-          <h3 className="font-extrabold text-[11px] uppercase tracking-widest">System Diagnostics</h3>
+          <h3 className="font-semibold text-[11px] tracking-normal">System Diagnostics</h3>
         </div>
         <div className="p-6 space-y-4">
-          <p className="text-[11px] text-slate-500 font-mono font-bold">Run diagnostics to verify all system components are operational.</p>
+          <p className="text-[11px] text-slate-500 font-bold">Run diagnostics to verify all system components are operational.</p>
           <button onClick={runDiagnostics} className="geo-btn-secondary flex items-center gap-1.5">
             <Terminal className="w-4 h-4" /> Run Diagnostics
           </button>
           {diagResults && (
-            <div className="border border-black divide-y divide-black font-mono">
+            <div className="border border-black divide-y divide-black ">
               {diagResults.map((d) => (
                 <div key={d.label} className="px-4 py-2.5 flex items-center justify-between text-[11px]">
                   <span className="font-bold text-black">{d.label}</span>
-                  <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 border ${
-                    d.status === 'ok' ? 'bg-emerald-100 text-emerald-700 border-emerald-300' :
-                    d.status === 'fail' ? 'bg-red-100 text-red-700 border-red-300' :
-                    'bg-amber-100 text-amber-700 border-amber-300 animate-pulse'
-                  }`}>{d.status}</span>
+                  <span className={`text-[9px] font-semibold px-2 py-0.5 border ${
+ d.status === 'ok' ? 'bg-emerald-100 text-emerald-700 border-emerald-300' :
+ d.status === 'fail' ? 'bg-red-100 text-red-700 border-red-300' :
+ 'bg-amber-100 text-amber-700 border-amber-300 animate-pulse'
+ }`}>{d.status}</span>
                 </div>
               ))}
             </div>
@@ -102,23 +102,23 @@ export default function SupportView() {
       <div className="bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] overflow-hidden">
         <div className="bg-black text-white px-6 py-3 flex items-center gap-3">
           <Send className="w-4 h-4 text-blue-400" />
-          <h3 className="font-extrabold text-[11px] uppercase tracking-widest">Submit a Ticket</h3>
+          <h3 className="font-semibold text-[11px] tracking-normal">Submit a Ticket</h3>
         </div>
         {submitted ? (
           <div className="p-12 flex flex-col items-center justify-center text-center gap-3">
             <CheckCircle className="w-10 h-10 text-emerald-500" />
-            <p className="font-extrabold text-black text-sm uppercase">Ticket Submitted</p>
-            <p className="text-[11px] text-slate-500 font-mono font-bold">We will get back to you soon.</p>
+            <p className="font-extrabold text-black text-sm ">Ticket Submitted</p>
+            <p className="text-[11px] text-slate-500 font-bold">We will get back to you soon.</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
             <div>
-              <label className="block text-[10px] font-extrabold text-black uppercase tracking-widest mb-1.5 font-mono">Subject</label>
-              <input type="text" value={ticket.subject} onChange={(e) => setTicket({ ...ticket, subject: e.target.value })} placeholder="Brief description..." className="w-full h-10 border-2 border-black px-3 text-[12px] font-bold font-mono uppercase text-black placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+              <label className="block text-[10px] font-semibold text-black tracking-normal mb-1.5 ">Subject</label>
+              <input type="text" value={ticket.subject} onChange={(e) => setTicket({ ...ticket, subject: e.target.value })} placeholder="Brief description..." className="w-full h-10 border-2 border-black px-3 text-[12px] font-bold text-black placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500" required />
             </div>
             <div>
-              <label className="block text-[10px] font-extrabold text-black uppercase tracking-widest mb-1.5 font-mono">Message</label>
-              <textarea value={ticket.message} onChange={(e) => setTicket({ ...ticket, message: e.target.value })} placeholder="Describe your issue in detail..." rows={4} className="w-full border-2 border-black px-3 py-2 text-[12px] font-bold font-mono text-black placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" required />
+              <label className="block text-[10px] font-semibold text-black tracking-normal mb-1.5 ">Message</label>
+              <textarea value={ticket.message} onChange={(e) => setTicket({ ...ticket, message: e.target.value })} placeholder="Describe your issue in detail..." rows={4} className="w-full border-2 border-black px-3 py-2 text-[12px] font-bold text-black placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" required />
             </div>
             <button type="submit" className="geo-btn-primary flex items-center gap-1.5">
               <Send className="w-4 h-4" /> Submit Ticket

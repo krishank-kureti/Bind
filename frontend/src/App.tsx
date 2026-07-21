@@ -267,14 +267,14 @@ export default function App() {
               <div className="w-20 h-20 border-4 border-black bg-black flex items-center justify-center text-white shadow-[8px_8px_0px_0px_#3b82f6] mx-auto mb-8">
                 <Cloud className="w-10 h-10" />
               </div>
-              <h1 className="font-black text-7xl text-black tracking-[0.15em] uppercase mb-4">BIND</h1>
-              <p className="text-sm text-slate-400 font-bold uppercase tracking-widest font-mono">Unified CloudVault Storage Router</p>
+              <h1 className="font-black text-7xl text-black tracking-tight mb-4">BIND</h1>
+              <p className="text-sm text-slate-400 font-bold tracking-normal ">Unified CloudVault Storage Router</p>
             </div>
             <div className="w-full">
               <div className="h-3 w-full bg-slate-100 border-2 border-black overflow-hidden">
                 <div className="h-full bg-[#3b82f6] geo-stripes transition-all duration-75" style={{ width: `${splashProgress}%` }} />
               </div>
-              <p className="text-[10px] text-slate-400 font-mono font-bold mt-3 uppercase tracking-widest">Initializing secure grid... {Math.round(splashProgress)}%</p>
+              <p className="text-[10px] text-slate-400 font-mono font-bold mt-3 tracking-normal">Initializing secure grid... {Math.round(splashProgress)}%</p>
             </div>
           </div>
         </div>
@@ -287,15 +287,15 @@ export default function App() {
           <div className="w-16 h-16 border-4 border-black bg-black flex items-center justify-center text-white shadow-[6px_6px_0px_0px_#3b82f6] mx-auto">
             <Cloud className="w-8 h-8" />
           </div>
-          <h1 className="font-black text-5xl text-black tracking-widest uppercase">BIND</h1>
+          <h1 className="font-black text-5xl text-black tracking-normal ">BIND</h1>
           <div className="bg-white border-2 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-8 space-y-5">
-            <p className="text-xs text-slate-600 font-mono font-bold leading-relaxed uppercase tracking-wide">
+            <p className="text-xs text-slate-600 font-bold leading-relaxed tracking-normal">
               Consolidate all your Google Drive accounts into a single unified interface.
             </p>
-            <p className="text-xs text-slate-600 font-mono font-bold leading-relaxed uppercase tracking-wide">
+            <p className="text-xs text-slate-600 font-bold leading-relaxed tracking-normal">
               Search, organize, and manage files across every cloud node from one secure command center.
             </p>
-            <p className="text-xs text-slate-600 font-mono font-bold leading-relaxed uppercase tracking-wide">
+            <p className="text-xs text-slate-600 font-bold leading-relaxed tracking-normal">
               Detect duplicates, reclaim storage, and route uploads intelligently.
             </p>
             <div className="pt-2">
@@ -304,7 +304,7 @@ export default function App() {
               </button>
             </div>
           </div>
-          <p className="text-[9px] text-slate-400 font-mono uppercase tracking-wider">Powered by Google OAuth 2.0</p>
+          <p className="text-[9px] text-slate-400 tracking-normal">Powered by Google OAuth 2.0</p>
         </div>
       </div>
     );
@@ -321,7 +321,7 @@ export default function App() {
         <TopNavBar currentTab={currentTab} />
         <main className="flex-1 p-8 pt-24 overflow-y-auto">
           {loading ? (
-            <div className="flex flex-col items-center justify-center p-24 text-slate-400 font-medium text-xs font-mono space-y-2 animate-pulse">
+            <div className="flex flex-col items-center justify-center p-24 text-slate-400 font-medium text-xs space-y-2 animate-pulse">
               <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
               <span>Piping cloud indexes...</span>
             </div>
@@ -337,7 +337,7 @@ export default function App() {
               {syncNotification.type === 'success' ? <CheckCircle className="w-4 h-4 text-white" /> : <XCircle className="w-4 h-4 text-white" />}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-extrabold uppercase tracking-widest text-black break-words">{syncNotification.message}</p>
+              <p className="text-[10px] font-semibold tracking-normal text-black break-words">{syncNotification.message}</p>
             </div>
             <button onClick={() => setSyncNotification(null)} className="text-slate-400 hover:text-black transition-colors shrink-0">
               <XCircle className="w-4 h-4" />

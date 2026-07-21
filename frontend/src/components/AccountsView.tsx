@@ -32,8 +32,8 @@ export default function AccountsView({ accounts, onOpenConnectModal, onRefreshAl
     <div className="space-y-6 max-w-5xl mx-auto pb-12">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="font-black text-black text-lg uppercase tracking-wider">Connected Accounts</h2>
-          <p className="text-[11px] text-slate-500 font-mono font-bold mt-1 uppercase">{accounts.length} integration node{accounts.length !== 1 ? 's' : ''}</p>
+          <h2 className="font-black text-black text-lg tracking-normal">Connected Accounts</h2>
+          <p className="text-[11px] text-slate-500 font-bold mt-1 ">{accounts.length} integration node{accounts.length !== 1 ? 's' : ''}</p>
         </div>
         <div className="flex gap-3">
           <button onClick={async () => { for (const a of accounts) await onSyncAccount(a.id); onRefreshAllData(); }} className="geo-btn-secondary flex items-center gap-1.5">
@@ -49,8 +49,8 @@ export default function AccountsView({ accounts, onOpenConnectModal, onRefreshAl
         {accounts.length === 0 ? (
           <div className="bg-white border-2 border-black p-12 text-center shadow-[4px_4px_0px_rgba(0,0,0,1)]">
             <CreditCard className="w-10 h-10 text-slate-300 mx-auto mb-4" />
-            <h3 className="font-extrabold text-slate-500 text-sm uppercase mb-3">No Accounts Linked</h3>
-            <p className="text-[12px] text-slate-400 font-mono font-bold mb-6">Connect a Google Drive account to get started.</p>
+            <h3 className="font-extrabold text-slate-500 text-sm mb-3">No Accounts Linked</h3>
+            <p className="text-[12px] text-slate-400 font-bold mb-6">Connect a Google Drive account to get started.</p>
             <button onClick={onOpenConnectModal} className="geo-btn-primary inline-flex items-center gap-2">
               <Plus className="w-4 h-4" /> Connect Google Drive
             </button>
@@ -68,13 +68,13 @@ export default function AccountsView({ accounts, onOpenConnectModal, onRefreshAl
                       {a.email.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <h3 className="font-extrabold text-[15px] text-black uppercase truncate">{a.displayName || a.email}</h3>
-                      <p className="text-[11px] text-slate-500 font-mono font-bold mt-0.5">{a.email}</p>
-                      <p className="text-[9px] text-blue-600 font-extrabold font-mono uppercase mt-0.5">{a.provider}</p>
+                      <h3 className="font-extrabold text-[15px] text-black truncate">{a.displayName || a.email}</h3>
+                      <p className="text-[11px] text-slate-500 font-bold mt-0.5">{a.email}</p>
+                      <p className="text-[9px] text-blue-600 font-semibold mt-0.5">{a.provider}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <span className={`text-[9px] font-extrabold uppercase tracking-widest px-2.5 py-1 border flex items-center gap-1.5 ${badge.cls}`}>
+                    <span className={`text-[9px] font-semibold tracking-normal px-2.5 py-1 border flex items-center gap-1.5 ${badge.cls}`}>
                       <Icon className={`w-3 h-3 ${a.syncStatus === 'SYNCING' ? 'animate-spin' : ''}`} /> {badge.label}
                     </span>
                     <button onClick={() => onSyncAccount(a.id)} className="p-2 border border-black bg-white text-blue-600 hover:bg-blue-50 transition-colors" title="Sync">
@@ -87,29 +87,29 @@ export default function AccountsView({ accounts, onOpenConnectModal, onRefreshAl
                 </div>
 
                 <div className="mt-5 pt-5 border-t border-slate-100">
-                  <div className="flex justify-between text-[11px] font-mono font-bold text-slate-600 mb-2 uppercase">
+                  <div className="flex justify-between text-[11px] font-bold text-slate-600 mb-2 ">
                     <span>Storage Allocation</span>
                     <span>{formatBytes(a.quotaUsed, 0)} / {formatBytes(a.quotaTotal, 0)}</span>
                   </div>
                   <div className="h-6 w-full bg-slate-100 border-2 border-black overflow-hidden">
                     <div className="h-full transition-all duration-300 flex items-center justify-end pr-2" style={{ width: `${pct}%`, backgroundColor: a.color }}>
-                      <span className="text-[9px] font-extrabold text-white drop-shadow-[1px_1px_0_rgba(0,0,0,0.8)]">{pct.toFixed(0)}%</span>
+                      <span className="text-[9px] font-semibold text-white drop-shadow-[1px_1px_0_rgba(0,0,0,0.8)]">{pct.toFixed(0)}%</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-3 gap-4 text-[10px] font-mono font-bold">
+                <div className="mt-4 grid grid-cols-3 gap-4 text-[10px] font-bold">
                   <div className="border border-black p-3 bg-slate-50">
-                    <span className="text-slate-500 uppercase block">Quota Total</span>
-                    <span className="text-black text-[13px] font-black">{formatBytes(a.quotaTotal, 1)}</span>
+                    <span className="text-slate-500 block">Quota Total</span>
+                    <span className="text-black text-[13px] font-bold">{formatBytes(a.quotaTotal, 1)}</span>
                   </div>
                   <div className="border border-black p-3 bg-slate-50">
-                    <span className="text-slate-500 uppercase block">Quota Used</span>
-                    <span className="text-black text-[13px] font-black">{formatBytes(a.quotaUsed, 1)}</span>
+                    <span className="text-slate-500 block">Quota Used</span>
+                    <span className="text-black text-[13px] font-bold">{formatBytes(a.quotaUsed, 1)}</span>
                   </div>
                   <div className="border border-black p-3 bg-slate-50">
-                    <span className="text-slate-500 uppercase block">Last Synced</span>
-                    <span className="text-black text-[13px] font-black">{a.lastSyncedAt ? new Date(a.lastSyncedAt).toLocaleDateString() : 'Never'}</span>
+                    <span className="text-slate-500 block">Last Synced</span>
+                    <span className="text-black text-[13px] font-bold">{a.lastSyncedAt ? new Date(a.lastSyncedAt).toLocaleDateString() : 'Never'}</span>
                   </div>
                 </div>
               </div>

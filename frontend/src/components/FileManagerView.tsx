@@ -342,7 +342,7 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
     <div className="space-y-6 max-w-5xl mx-auto pb-12">
       <div className="flex flex-col gap-4">
         <div className="flex justify-between items-center">
-          <nav className="flex items-center gap-1.5 text-[10.5px] text-slate-600 font-mono font-bold uppercase tracking-wider">
+          <nav className="flex items-center gap-1.5 text-[10.5px] text-slate-600 font-bold tracking-normal">
             <span className="hover:text-blue-600 cursor-pointer" onClick={() => { setNavigatedFolderId(null); setFolderBreadcrumb([]); setActiveAccountId(null); }}>Files</span>
             {folderBreadcrumb.length > 0 && <ChevronRight className="w-3.5 h-3.5 text-black shrink-0" />}
             {isInAccountsMode && activeAccountId === null && (
@@ -366,7 +366,7 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
                 placeholder="SEARCH..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-36 h-full px-2.5 text-[11px] font-bold font-mono uppercase tracking-wider text-black placeholder:text-slate-300 focus:outline-none"
+                className="w-36 h-full px-2.5 text-[11px] font-bold tracking-normal text-black placeholder:text-slate-300 focus:outline-none"
               />
             </div>
             <button onClick={onOpenUploadModal} className="geo-btn-primary flex items-center gap-1.5">
@@ -383,9 +383,9 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
                 <button
                   key={tab.id}
                   onClick={() => setOwnershipFilter(tab.id)}
-                  className={`h-7 px-3 rounded-none text-[10px] font-extrabold uppercase tracking-widest border cursor-pointer transition-all ${
-                    isActive ? "bg-black text-white border-black shadow-[2px_2px_0px_0px_#3b82f6]" : "bg-white text-black border-black hover:bg-slate-50"
-                  }`}
+                  className={`h-7 px-3 rounded-none text-[10px] font-semibold tracking-normal border cursor-pointer transition-all ${
+ isActive ? "bg-black text-white border-black shadow-[2px_2px_0px_0px_#3b82f6]" : "bg-white text-black border-black hover:bg-slate-50"
+ }`}
                 >
                   {tab.label}
                 </button>
@@ -400,9 +400,9 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
                 <button
                   key={tab.id}
                   onClick={() => setCategoryFilter(tab.id === categoryFilter ? 'all' : tab.id)}
-                  className={`h-8 px-4 rounded-none text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 border cursor-pointer transition-all ${
-                    isActive ? "bg-black text-white border-black shadow-[2.5px_2.5px_0px_0px_#3b82f6]" : "bg-white text-black border-black hover:bg-slate-50"
-                  }`}
+                  className={`h-8 px-4 rounded-none text-[11px] font-semibold tracking-normal flex items-center gap-1.5 border cursor-pointer transition-all ${
+ isActive ? "bg-black text-white border-black shadow-[2.5px_2.5px_0px_0px_#3b82f6]" : "bg-white text-black border-black hover:bg-slate-50"
+ }`}
                 >
                   {Icon && <Icon className="w-3.5 h-3.5" />} {tab.label}
                 </button>
@@ -417,16 +417,16 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
           {accounts.map((a) => (
             <div key={a.id} onClick={() => handleAccountClick(a)} className="bg-white border-2 border-black p-5 cursor-pointer shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_rgba(0,0,0,1)] transition-all">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 border-2 border-black text-sm font-black text-white flex items-center justify-center shadow-[2px_2px_0px_rgba(0,0,0,1)]" style={{ backgroundColor: a.color }}>
+                <div className="w-10 h-10 border-2 border-black text-sm font-bold text-white flex items-center justify-center shadow-[2px_2px_0px_rgba(0,0,0,1)]" style={{ backgroundColor: a.color }}>
                   {a.email.charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 className="font-extrabold text-[13px] text-black uppercase truncate">{a.email.split('@')[0]}</h3>
-                  <p className="text-[9px] text-[#2563eb] font-mono font-extrabold uppercase mt-0.5 truncate">{a.email}</p>
+                  <h3 className="font-extrabold text-[13px] text-black truncate">{a.email.split('@')[0]}</h3>
+                  <p className="text-[9px] text-[#2563eb] font-semibold mt-0.5 truncate">{a.email}</p>
                 </div>
               </div>
-              <div className="flex items-center justify-between text-[11px] font-mono font-bold">
-                <span className="text-slate-500 uppercase">{a.id ? `${a.email.split('@')[0]}'s root` : ''}</span>
+              <div className="flex items-center justify-between text-[11px] font-bold">
+                <span className="text-slate-500 ">{a.id ? `${a.email.split('@')[0]}'s root` : ''}</span>
                 <ChevronRight className="w-4 h-4 text-black" />
               </div>
             </div>
@@ -434,7 +434,7 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
         </div>
       ) : (
         <div className="bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] overflow-hidden">
-          <div className="h-11 bg-slate-100 border-b-2 border-black flex items-center px-6 text-[10px] text-black font-mono font-extrabold uppercase tracking-widest">
+          <div className="h-11 bg-slate-100 border-b-2 border-black flex items-center px-6 text-[10px] text-black font-semibold tracking-normal">
             <div className="w-8 shrink-0" />
             <div className="flex-1 min-w-[200px]">Name</div>
             <div className="w-44 hidden sm:block">Source</div>
@@ -444,11 +444,11 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
           </div>
 
           {loadingFiles && sortedFiles.length === 0 ? (
-            <div className="p-12 text-center text-slate-400 font-mono text-xs uppercase font-bold flex items-center justify-center gap-2">
+            <div className="p-12 text-center text-slate-400 text-xs font-bold flex items-center justify-center gap-2">
               <RefreshCw className="w-4 h-4 animate-spin" /> Loading...
             </div>
           ) : sortedFiles.length === 0 ? (
-            <div className="p-12 text-center text-slate-500 font-mono text-xs uppercase font-bold">No files found.</div>
+            <div className="p-12 text-center text-slate-500 text-xs font-bold">No files found.</div>
           ) : (
             <div className="divide-y divide-black relative">
               {sortedFiles.map((file) => (
@@ -463,7 +463,7 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
                           value={renameValue}
                           onChange={(e) => setRenameValue(e.target.value)}
                           onKeyDown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') setRenameFileId(null); }}
-                          className="flex-1 h-7 border-2 border-black px-2 text-[11px] font-bold font-mono uppercase focus:outline-none"
+                          className="flex-1 h-7 border-2 border-black px-2 text-[11px] font-bold focus:outline-none"
                           autoFocus
                         />
                         <button onClick={submitRename} className="p-1 bg-black text-white border border-black"><Check className="w-3 h-3" /></button>
@@ -471,7 +471,7 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
                       </div>
                     ) : (
                       <>
-                        <span className={`text-black truncate uppercase ${file.isFolder ? 'cursor-pointer hover:text-blue-600' : ''}`}
+                        <span className={`text-black truncate ${file.isFolder ? 'cursor-pointer hover:text-blue-600' : ''}`}
                           onClick={() => file.isFolder && handleFolderClick(file)}>
                           {file.name}
                         </span>
@@ -480,15 +480,15 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
                     )}
                   </div>
                   <div className="w-44 hidden sm:flex items-center">
-                    <span className="px-2 py-1 text-[9.5px] font-extrabold flex items-center gap-1.5 border border-black uppercase tracking-wider" style={{ backgroundColor: `${getAccountColor(file.accountEmail)}15` }}>
+                    <span className="px-2 py-1 text-[9.5px] font-semibold flex items-center gap-1.5 border border-black tracking-normal" style={{ backgroundColor: `${getAccountColor(file.accountEmail)}15` }}>
                       <span className="w-2 h-2 border border-black shrink-0" style={{ backgroundColor: getAccountColor(file.accountEmail) }} />
-                      <span className="truncate max-w-[124px] font-mono">{file.accountEmail?.split('@')[0] || 'SYS'}</span>
+                      <span className="truncate max-w-[124px] ">{file.accountEmail?.split('@')[0] || 'SYS'}</span>
                     </span>
                   </div>
-                  <div className="w-24 text-right font-extrabold text-slate-800 font-mono text-[11px]">
+                  <div className="w-24 text-right font-semibold text-slate-800 text-[11px]">
                     {file.isFolder ? '--' : formatBytes(file.sizeBytes)}
                   </div>
-                  <div className="w-20 text-right font-bold text-slate-500 font-mono text-[10.5px]">{file.modified}</div>
+                  <div className="w-20 text-right font-bold text-slate-500 text-[10.5px]">{file.modified}</div>
                   <div className="w-20 flex items-center justify-end">
                     <button
                       onClick={(e) => {
@@ -513,7 +513,7 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
 
           {hasMore && (
             <div className="border-t-2 border-black">
-              <button onClick={() => fetchFiles(true)} disabled={loadingFiles} className="w-full h-12 flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-[11px] font-extrabold uppercase tracking-widest text-blue-600 transition-colors disabled:opacity-50">
+              <button onClick={() => fetchFiles(true)} disabled={loadingFiles} className="w-full h-12 flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-[11px] font-semibold tracking-normal text-blue-600 transition-colors disabled:opacity-50">
                 {loadingFiles ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
                 Load More ({total - localFiles.length} remaining)
               </button>
@@ -527,27 +527,27 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
         if (!file) return null;
         return (
           <div ref={menuRef} className="fixed z-50 bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] w-44 py-1" style={{ top: menuPosition.top, left: menuPosition.left }}>
-            <button onClick={() => handleToggleStar(file.id)} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-wider hover:bg-slate-50 text-left">
+            <button onClick={() => handleToggleStar(file.id)} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-semibold tracking-normal hover:bg-slate-50 text-left">
               <Star className={`w-3.5 h-3.5 ${file.starred ? 'text-amber-500 fill-amber-500' : 'text-slate-400'}`} /> {file.starred ? 'Unstar' : 'Star'}
             </button>
-            <button onClick={() => openRename(file)} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-wider hover:bg-slate-50 text-left">
+            <button onClick={() => openRename(file)} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-semibold tracking-normal hover:bg-slate-50 text-left">
               <Edit3 className="w-3.5 h-3.5 text-slate-400" /> Rename
             </button>
-            <button onClick={() => handleCopyFile(file.id)} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-wider hover:bg-slate-50 text-left">
+            <button onClick={() => handleCopyFile(file.id)} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-semibold tracking-normal hover:bg-slate-50 text-left">
               <Copy className="w-3.5 h-3.5 text-slate-400" /> Copy
             </button>
-            <button onClick={() => openMoveDialog(file.id)} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-wider hover:bg-slate-50 text-left">
+            <button onClick={() => openMoveDialog(file.id)} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-semibold tracking-normal hover:bg-slate-50 text-left">
               <Move className="w-3.5 h-3.5 text-slate-400" /> Move
             </button>
             <div className="border-t border-black my-1" />
-            <button onClick={() => handleDeleteFile(file.id)} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-wider hover:bg-red-50 text-red-600 text-left">
+            <button onClick={() => handleDeleteFile(file.id)} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-semibold tracking-normal hover:bg-red-50 text-red-600 text-left">
               <Trash2 className="w-3.5 h-3.5" /> Trash
             </button>
           </div>
         );
       })()}
 
-      <div className="flex items-center justify-between text-slate-500 font-mono text-[10px] px-2 font-extrabold uppercase tracking-wide">
+      <div className="flex items-center justify-between text-slate-500 text-[10px] px-2 font-semibold tracking-normal">
         <span>{total || sortedFiles.length} file{(total || sortedFiles.length) !== 1 ? 's' : ''} ({formatBytes(totalSize)} total)</span>
         <span className="flex items-center gap-1.5 text-blue-600"><Shield className="w-3.5 h-3.5" /> Encrypted</span>
       </div>
@@ -558,7 +558,7 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
             <div className="bg-black text-white px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Move className="w-5 h-5 text-blue-400" />
-                <h2 className="font-extrabold text-[12px] uppercase tracking-widest">Move File</h2>
+                <h2 className="font-extrabold text-[12px] tracking-normal">Move File</h2>
               </div>
               <button onClick={() => setMoveDialogOpen(false)} className="text-white hover:text-slate-300 transition-colors">
                 <X className="w-5 h-5" />
@@ -566,18 +566,18 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
             </div>
             <div className="p-6 space-y-5">
               <div className="flex gap-2">
-                <button onClick={() => setMoveMode('same')} className={`flex-1 py-2 text-[10px] font-extrabold uppercase tracking-widest border ${moveMode === 'same' ? 'bg-black text-white border-black shadow-[2px_2px_0px_#3b82f6]' : 'bg-white text-slate-500 border-slate-300 hover:border-black'}`}>
+                <button onClick={() => setMoveMode('same')} className={`flex-1 py-2 text-[10px] font-semibold tracking-normal border ${moveMode === 'same' ? 'bg-black text-white border-black shadow-[2px_2px_0px_#3b82f6]' : 'bg-white text-slate-500 border-slate-300 hover:border-black'}`}>
                   Same Account
                 </button>
-                <button onClick={() => setMoveMode('across')} className={`flex-1 py-2 text-[10px] font-extrabold uppercase tracking-widest border ${moveMode === 'across' ? 'bg-black text-white border-black shadow-[2px_2px_0px_#3b82f6]' : 'bg-white text-slate-500 border-slate-300 hover:border-black'}`}>
+                <button onClick={() => setMoveMode('across')} className={`flex-1 py-2 text-[10px] font-semibold tracking-normal border ${moveMode === 'across' ? 'bg-black text-white border-black shadow-[2px_2px_0px_#3b82f6]' : 'bg-white text-slate-500 border-slate-300 hover:border-black'}`}>
                   Different Account
                 </button>
               </div>
 
               {moveMode === 'across' && (
                 <div>
-                  <label className="block text-[10px] font-extrabold text-black uppercase tracking-widest mb-1.5 font-mono">Target Account</label>
-                  <select value={moveTargetAccountId || ''} onChange={(e) => setMoveTargetAccountId(e.target.value || null)} className="w-full h-10 border-2 border-black px-3 text-[11px] font-bold font-mono uppercase bg-white focus:outline-none">
+                  <label className="block text-[10px] font-semibold text-black tracking-normal mb-1.5 ">Target Account</label>
+                  <select value={moveTargetAccountId || ''} onChange={(e) => setMoveTargetAccountId(e.target.value || null)} className="w-full h-10 border-2 border-black px-3 text-[11px] font-bold bg-white focus:outline-none">
                     <option value="">Select account...</option>
                     {accounts.filter((a) => a.id !== localFiles.find((f) => f.id === moveFileId)?.accountId).map((a) => (
                       <option key={a.id} value={a.id}>{a.email}</option>
@@ -587,8 +587,8 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
               )}
 
               <div>
-                <label className="block text-[10px] font-extrabold text-black uppercase tracking-widest mb-1.5 font-mono">Target Folder</label>
-                <select value={moveTargetFolderId || ''} onChange={(e) => setMoveTargetFolderId(e.target.value || null)} className="w-full h-10 border-2 border-black px-3 text-[11px] font-bold font-mono uppercase bg-white focus:outline-none">
+                <label className="block text-[10px] font-semibold text-black tracking-normal mb-1.5 ">Target Folder</label>
+                <select value={moveTargetFolderId || ''} onChange={(e) => setMoveTargetFolderId(e.target.value || null)} className="w-full h-10 border-2 border-black px-3 text-[11px] font-bold bg-white focus:outline-none">
                   <option value="">Root folder</option>
                   {(moveMode === 'across' && moveTargetAccountId ? allFolders.filter((f) => f.accountId === moveTargetAccountId) : allFolders).map((f) => (
                     <option key={f.id} value={f.providerId}>{f.name}</option>
@@ -597,7 +597,7 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
-                <button onClick={() => setMoveDialogOpen(false)} className="px-4 py-2 border border-black bg-white text-slate-600 hover:bg-slate-50 text-[10px] font-extrabold uppercase tracking-widest shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-0.5 transition-all">
+                <button onClick={() => setMoveDialogOpen(false)} className="px-4 py-2 border border-black bg-white text-slate-600 hover:bg-slate-50 text-[10px] font-semibold tracking-normal shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-0.5 transition-all">
                   Cancel
                 </button>
                 <button onClick={submitMove} className="geo-btn-primary text-[10px] flex items-center gap-1.5">
@@ -616,7 +616,7 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
               {syncNotification.type === 'success' ? <Check className="w-4 h-4 text-white" /> : <X className="w-4 h-4 text-white" />}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-extrabold uppercase tracking-widest text-black break-words">{syncNotification.message}</p>
+              <p className="text-[10px] font-semibold tracking-normal text-black break-words">{syncNotification.message}</p>
             </div>
             <button onClick={() => setSyncNotification(null)} className="text-slate-400 hover:text-black transition-colors shrink-0">
               <X className="w-4 h-4" />

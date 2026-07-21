@@ -1,8 +1,150 @@
 @import "tailwindcss";
 
+/* ── Tiempos Text (UI / body) ── */
+@font-face {
+  font-family: "Tiempos Text";
+  src: url("/fonts/tiempos/TiemposText-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Text";
+  src: url("/fonts/tiempos/TiemposText-RegularItalic.otf") format("opentype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Text";
+  src: url("/fonts/tiempos/TiemposText-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Text";
+  src: url("/fonts/tiempos/TiemposText-MediumItalic.otf") format("opentype");
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Text";
+  src: url("/fonts/tiempos/TiemposText-Semibold.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Text";
+  src: url("/fonts/tiempos/TiemposText-SemiboldItalic.otf") format("opentype");
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Text";
+  src: url("/fonts/tiempos/TiemposText-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Text";
+  src: url("/fonts/tiempos/TiemposText-BoldItalic.otf") format("opentype");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+/* Map extrabold/black UI weights onto Bold (Text family tops out at 700) */
+@font-face {
+  font-family: "Tiempos Text";
+  src: url("/fonts/tiempos/TiemposText-Bold.otf") format("opentype");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Text";
+  src: url("/fonts/tiempos/TiemposText-Bold.otf") format("opentype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ── Tiempos Headline (titles / display) ── */
+@font-face {
+  font-family: "Tiempos Headline";
+  src: url("/fonts/tiempos/TiemposHeadline-Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Headline";
+  src: url("/fonts/tiempos/TiemposHeadline-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Headline";
+  src: url("/fonts/tiempos/TiemposHeadline-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Headline";
+  src: url("/fonts/tiempos/TiemposHeadline-Semibold.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Headline";
+  src: url("/fonts/tiempos/TiemposHeadline-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Headline";
+  src: url("/fonts/tiempos/TiemposHeadline-Black.otf") format("opentype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Tiempos Headline";
+  src: url("/fonts/tiempos/TiemposHeadline-Black.otf") format("opentype");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
-  --font-sans: "Helvetica Neue", "Arial", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Tiempos Text", "Times New Roman", Times, Georgia, serif;
+  --font-display: "Tiempos Headline", "Tiempos Text", "Times New Roman", Times, Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+html, body, #root {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* Display titles use Headline cut */
+h1, h2, .font-display {
+  font-family: var(--font-display);
+}
+
+/* Never force all-caps anywhere in the app */
+*, *::before, *::after {
+  text-transform: none !important;
 }
 
 .geo-cell {
@@ -29,8 +171,7 @@
   border: 1px solid #000000;
   border-radius: 0px !important;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.01em;
   font-size: 11px;
   height: 40px;
   padding: 0 16px;
@@ -58,8 +199,7 @@
   border: 1px solid #000000;
   border-radius: 0px !important;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.01em;
   font-size: 11px;
   height: 40px;
   padding: 0 16px;
@@ -104,8 +244,7 @@
   font-size: 10px;
   padding: 4px 12px;
   border-radius: 0px !important;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.01em;
 }
 
 .geo-badge-outline {
@@ -116,6 +255,5 @@
   font-size: 10px;
   padding: 4px 12px;
   border-radius: 0px !important;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.01em;
 }
