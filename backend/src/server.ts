@@ -4,6 +4,7 @@ import { logger } from './utils/logger.js';
 import { prisma } from './config/prisma.js';
 import { existsSync, mkdirSync } from 'node:fs';
 import { redis } from './config/redis.js';
+import { startPeriodicSync, stopPeriodicSync } from './services/periodicSync.service.js';
 
 async function main(): Promise<void> {
   await prisma.$connect();
@@ -26,8 +27,11 @@ async function main(): Promise<void> {
     logger.info({ port: env.PORT }, `Server running on ${env.APP_URL}`);
   });
 
+  startPeriodicSync();
+
   const shutdown = async () => {
     logger.info('Shutting down...');
+    stopPeriodicSync();
     await prisma.$disconnect();
     redis.disconnect();
     process.exit(0);

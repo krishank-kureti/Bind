@@ -10,6 +10,13 @@ import SettingsView from './components/SettingsView';
 import SupportView from './components/SupportView';
 import { ConnectAccountModal, UploadModal } from './components/Modals';
 import { apiFetch } from './api';
+import {
+  applyStoredTheme,
+  fetchSettings,
+  DEFAULT_SETTINGS,
+  type UserSettings,
+  type ThemeMode,
+} from './settings';
 import { Cloud, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
 
 function categorizeMimeType(mimeType: string, isFolder: boolean): string {
@@ -81,6 +88,8 @@ export default function App() {
   const [syncNotification, setSyncNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [splashProgress, setSplashProgress] = useState(0);
   const [splashDone, setSplashDone] = useState(false);
+  const [userSettings, setUserSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
+  const [theme, setThemeState] = useState<ThemeMode>(() => applyStoredTheme());
 
   const checkAuth = async () => {
     try {
@@ -89,7 +98,8 @@ export default function App() {
         const body = await res.json();
         if (body.data?.user) {
           setIsAuthenticated(true);
-          await fetchAllData();
+          const [settings] = await Promise.all([fetchSettings(), fetchAllData()]);
+          setUserSettings(settings);
           return;
         }
       }
@@ -194,17 +204,22 @@ export default function App() {
     }
   };
 
+  const showSyncToast = (message: string, type: 'success' | 'error') => {
+    if (!userSettings.notificationsEnabled) return;
+    setSyncNotification({ message, type });
+    setTimeout(() => setSyncNotification(null), 4000);
+  };
+
   const handleSyncAllAccounts = async () => {
     setIsSyncing(true);
     const results = await Promise.all(accounts.map((a) => handleSyncAccount(a.id)));
     const failedAccounts = accounts.filter((_, i) => results[i] === 'ERROR').map((a) => a.email.split('@')[0]);
     await fetchAllData(true);
     if (failedAccounts.length === 0) {
-      setSyncNotification({ message: `All ${accounts.length} account${accounts.length > 1 ? 's' : ''} synced successfully`, type: 'success' });
+      showSyncToast(`All ${accounts.length} account${accounts.length > 1 ? 's' : ''} synced successfully`, 'success');
     } else {
-      setSyncNotification({ message: `${failedAccounts.join(', ')} failed to sync`, type: 'error' });
+      showSyncToast(`${failedAccounts.join(', ')} failed to sync`, 'error');
     }
-    setTimeout(() => setSyncNotification(null), 4000);
   };
 
   const refreshStorageOnly = async () => {
@@ -247,6 +262,7 @@ export default function App() {
     setLoading(false);
     setSplashDone(false);
     setSplashProgress(0);
+    setUserSettings(DEFAULT_SETTINGS);
   };
 
   const handleDisconnectAccount = async (id: string) => {
@@ -315,11 +331,11 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-50 flex app-shell">
       <SideNavBar currentTab={currentTab} setCurrentTab={setCurrentTab} onOpenConnectModal={() => setIsConnectOpen(true)} accountsCount={accounts.length} accounts={accounts} onLogout={handleLogout} />
-      <div className="flex-1 ml-64 flex flex-col min-h-screen relative font-sans">
+      <div className="flex-1 ml-64 flex flex-col min-h-screen relative font-sans app-main">
         <TopNavBar currentTab={currentTab} />
-        <main className="flex-1 p-8 pt-24 overflow-y-auto">
+        <main className="flex-1 p-8 pt-24 overflow-y-auto app-content">
           {loading ? (
             <div className="flex flex-col items-center justify-center p-24 text-slate-400 font-medium text-xs space-y-2 animate-pulse">
               <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
@@ -329,7 +345,12 @@ export default function App() {
         </main>
       </div>
       <ConnectAccountModal isOpen={isConnectOpen} onClose={() => setIsConnectOpen(false)} onSubmit={handleConnectAccount} />
-      <UploadModal isOpen={isUploadOpen} onClose={() => { setIsUploadOpen(false); fetchAllData(true); setRefreshTick((t) => t + 1); }} accounts={accounts} />
+      <UploadModal
+        isOpen={isUploadOpen}
+        onClose={() => { setIsUploadOpen(false); fetchAllData(true); setRefreshTick((t) => t + 1); }}
+        accounts={accounts}
+        uploadMode={userSettings.uploadMode}
+      />
       {syncNotification && (
         <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-bottom-2 fade-in">
           <div className={`bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] px-5 py-3.5 flex items-center gap-3 min-w-[280px] max-w-sm`}>
@@ -359,7 +380,14 @@ export default function App() {
       case 'accounts':
         return <AccountsView accounts={accounts} onOpenConnectModal={() => setIsConnectOpen(true)} onRefreshAllData={() => fetchAllData(true)} onDisconnectAccount={handleDisconnectAccount} onSyncAccount={handleSyncAccount} />;
       case 'settings':
-        return <SettingsView />;
+        return (
+          <SettingsView
+            settings={userSettings}
+            theme={theme}
+            onSettingsChange={setUserSettings}
+            onThemeChange={setThemeState}
+          />
+        );
       case 'support':
         return <SupportView />;
       default:

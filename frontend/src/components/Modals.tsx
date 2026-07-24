@@ -13,6 +13,7 @@ interface UploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   accounts: CloudAccount[];
+  uploadMode?: 'auto' | 'manual';
 }
 
 interface UploadFileEntry {
@@ -67,18 +68,23 @@ export function ConnectAccountModal({ isOpen, onClose, onSubmit }: ConnectAccoun
   );
 }
 
-export function UploadModal({ isOpen, onClose, accounts }: UploadModalProps) {
+export function UploadModal({ isOpen, onClose, accounts, uploadMode = 'auto' }: UploadModalProps) {
   const [dragOver, setDragOver] = useState(false);
   const [files, setFiles] = useState<UploadFileEntry[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isManual = uploadMode === 'manual';
 
   useEffect(() => {
     if (!isOpen) {
       setFiles([]);
       setUploading(false);
+      setSelectedAccountId('');
+    } else if (isManual && accounts.length === 1) {
+      setSelectedAccountId(accounts[0]!.id);
     }
-  }, [isOpen]);
+  }, [isOpen, isManual, accounts]);
 
   const checkAllDone = useCallback(() => {
     setFiles((prev) => {
@@ -110,6 +116,9 @@ export function UploadModal({ isOpen, onClose, accounts }: UploadModalProps) {
   }, [addFiles]);
 
   const handleUploadAll = useCallback(async () => {
+    if (isManual && !selectedAccountId) {
+      return;
+    }
     setUploading(true);
     const toUpload = files.filter((f) => f.status === 'queued');
     if (toUpload.length === 0) return;
@@ -119,6 +128,9 @@ export function UploadModal({ isOpen, onClose, accounts }: UploadModalProps) {
     for (const entry of toUpload) {
       const formData = new FormData();
       formData.append('file', entry.file);
+      if (isManual && selectedAccountId) {
+        formData.append('accountId', selectedAccountId);
+      }
       try {
         const res = await apiFetch('/api/upload', { method: 'POST', body: formData });
         if (res.ok) {
@@ -144,7 +156,7 @@ export function UploadModal({ isOpen, onClose, accounts }: UploadModalProps) {
         );
       }
     }
-  }, [files]);
+  }, [files, isManual, selectedAccountId, checkAllDone]);
 
   const removeFile = useCallback((id: string) => {
     setFiles((prev) => prev.filter((f) => f.id !== id));
@@ -156,12 +168,13 @@ export function UploadModal({ isOpen, onClose, accounts }: UploadModalProps) {
 
   const queuedCount = files.filter((f) => f.status === 'queued').length;
   const allDone = files.length > 0 && files.every((f) => f.status === 'success' || f.status === 'failed');
+  const canUpload = queuedCount > 0 && (!isManual || !!selectedAccountId);
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-white border-2 border-black shadow-[8px_8px_0px_rgba(0,0,0,1)] w-full max-w-lg mx-4 relative max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white border-2 border-black shadow-[8px_8px_0px_rgba(0,0,0,1)] w-full max-w-lg mx-4 relative max-h-[90vh] flex flex-col modal-panel" onClick={(e) => e.stopPropagation()}>
         <div className="bg-black text-white px-6 py-4 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <Upload className="w-5 h-5 text-blue-400" />
@@ -173,6 +186,30 @@ export function UploadModal({ isOpen, onClose, accounts }: UploadModalProps) {
         </div>
 
         <div className="p-6 space-y-5 overflow-y-auto flex-1">
+          {isManual ? (
+            <div>
+              <label className="block text-[10px] font-semibold text-black tracking-normal mb-1.5">Target account</label>
+              <select
+                value={selectedAccountId}
+                onChange={(e) => setSelectedAccountId(e.target.value)}
+                className="w-full h-10 border-2 border-black px-3 text-[11px] font-bold bg-white focus:outline-none"
+                disabled={uploading}
+              >
+                <option value="">Select account…</option>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.email} ({formatBytes(Math.max(0, a.quotaTotal - a.quotaUsed), 1)} free)
+                  </option>
+                ))}
+              </select>
+              <p className="text-[9px] text-slate-500 font-bold mt-1.5">Manual routing is on — pick where these files go.</p>
+            </div>
+          ) : (
+            <p className="text-[10px] text-slate-500 font-bold border border-black bg-slate-50 px-3 py-2">
+              Auto routing: files go to the connected account with the most free storage.
+            </p>
+          )}
+
           <div
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
@@ -258,7 +295,11 @@ export function UploadModal({ isOpen, onClose, accounts }: UploadModalProps) {
                   Cancel
                 </button>
                 {files.length > 0 && queuedCount > 0 && (
-                  <button onClick={handleUploadAll} disabled={uploading} className="geo-btn-primary text-[10px] flex items-center gap-1.5">
+                  <button
+                    onClick={handleUploadAll}
+                    disabled={uploading || !canUpload}
+                    className="geo-btn-primary text-[10px] flex items-center gap-1.5 disabled:opacity-50"
+                  >
                     <Upload className="w-3.5 h-3.5" /> Upload {queuedCount > 1 ? `All (${queuedCount})` : ''}
                   </button>
                 )}

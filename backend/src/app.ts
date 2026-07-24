@@ -22,6 +22,7 @@ import storageRoutes from './routes/storage.routes.js';
 import uploadRoutes from './routes/upload.routes.js';
 import duplicateRoutes from './routes/duplicates.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
+import settingsRoutes from './routes/settings.routes.js';
 
 // Allow BigInt serialization in JSON responses
 (BigInt.prototype as unknown as Record<string, unknown>).toJSON = function () {
@@ -88,6 +89,7 @@ app.use('/api/storage', storageRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/duplicates', duplicateRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

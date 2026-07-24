@@ -343,3 +343,170 @@ button, input, select, textarea, label, a {
   border-radius: 0px !important;
   letter-spacing: 0.01em;
 }
+
+/* ── Theme tokens ── */
+:root,
+html[data-theme="light"] {
+  --bind-bg: #f8fafc;
+  --bind-surface: #ffffff;
+  --bind-surface-muted: #f1f5f9;
+  --bind-text: #0f172a;
+  --bind-text-muted: #64748b;
+  --bind-border: #000000;
+  --bind-shadow: #000000;
+  --bind-accent: #3b82f6;
+  --bind-panel-header: #000000;
+  --bind-panel-header-text: #ffffff;
+}
+
+html[data-theme="dark"] {
+  --bind-bg: #0b0f14;
+  --bind-surface: #141a22;
+  --bind-surface-muted: #1c2430;
+  --bind-text: #f1f5f9;
+  --bind-text-muted: #94a3b8;
+  --bind-border: #e2e8f0;
+  --bind-shadow: #3b82f6;
+  --bind-accent: #60a5fa;
+  --bind-panel-header: #0f172a;
+  --bind-panel-header-text: #f8fafc;
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] body,
+html[data-theme="dark"] #root {
+  background-color: var(--bind-bg);
+  color: var(--bind-text);
+}
+
+html[data-theme="dark"] .app-shell {
+  background-color: var(--bind-bg) !important;
+}
+
+html[data-theme="dark"] .app-main,
+html[data-theme="dark"] .app-content {
+  background-color: var(--bind-bg);
+  color: var(--bind-text);
+}
+
+/* Side nav */
+html[data-theme="dark"] aside {
+  background-color: var(--bind-surface) !important;
+  border-color: var(--bind-border) !important;
+  color: var(--bind-text);
+}
+
+html[data-theme="dark"] aside .bg-slate-50,
+html[data-theme="dark"] aside .bg-\[\#f8fafc\],
+html[data-theme="dark"] aside .bg-white {
+  background-color: var(--bind-surface-muted) !important;
+}
+
+html[data-theme="dark"] aside .text-black,
+html[data-theme="dark"] aside .text-slate-600,
+html[data-theme="dark"] header .text-black {
+  color: var(--bind-text) !important;
+}
+
+html[data-theme="dark"] aside .border-black,
+html[data-theme="dark"] header.border-b-2 {
+  border-color: var(--bind-border) !important;
+}
+
+html[data-theme="dark"] header {
+  background-color: var(--bind-surface) !important;
+  color: var(--bind-text);
+}
+
+/* Cards / white panels across views */
+html[data-theme="dark"] .settings-card,
+html[data-theme="dark"] .settings-cache-card,
+html[data-theme="dark"] .bg-white {
+  background-color: var(--bind-surface) !important;
+  color: var(--bind-text);
+}
+
+html[data-theme="dark"] .border-black {
+  border-color: var(--bind-border) !important;
+}
+
+html[data-theme="dark"] .text-black {
+  color: var(--bind-text) !important;
+}
+
+html[data-theme="dark"] .text-slate-500,
+html[data-theme="dark"] .text-slate-400,
+html[data-theme="dark"] .text-slate-600 {
+  color: var(--bind-text-muted) !important;
+}
+
+html[data-theme="dark"] .bg-slate-50,
+html[data-theme="dark"] .bg-slate-100 {
+  background-color: var(--bind-surface-muted) !important;
+}
+
+html[data-theme="dark"] .bg-amber-50,
+html[data-theme="dark"] .bg-amber-100 {
+  background-color: #3d2e12 !important;
+  color: var(--bind-text);
+}
+
+html[data-theme="dark"] .shadow-\[4px_4px_0px_rgba\(0\,0\,0\,1\)\],
+html[data-theme="dark"] .shadow-\[4px_4px_0px_0px_rgba\(0\,0\,0\,1\)\],
+html[data-theme="dark"] .shadow-\[6px_6px_0px_rgba\(0\,0\,0\,1\)\],
+html[data-theme="dark"] .shadow-\[8px_8px_0px_rgba\(0\,0\,0\,1\)\] {
+  box-shadow: 4px 4px 0px 0px var(--bind-shadow) !important;
+}
+
+html[data-theme="dark"] .geo-btn-primary {
+  background-color: var(--bind-accent);
+  color: #0b0f14;
+  border-color: var(--bind-border);
+  box-shadow: 3px 3px 0px 0px #000000;
+}
+
+html[data-theme="dark"] .geo-btn-secondary {
+  background-color: var(--bind-surface);
+  color: var(--bind-text);
+  border-color: var(--bind-border);
+  box-shadow: 3px 3px 0px 0px var(--bind-accent);
+}
+
+html[data-theme="dark"] .geo-cell {
+  background-color: var(--bind-surface);
+  border-color: var(--bind-border);
+  box-shadow: 4px 4px 0px 0px var(--bind-shadow);
+}
+
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea {
+  background-color: var(--bind-surface-muted) !important;
+  color: var(--bind-text) !important;
+  border-color: var(--bind-border) !important;
+}
+
+html[data-theme="dark"] .settings-pill-inactive {
+  background-color: var(--bind-surface-muted) !important;
+  color: var(--bind-text-muted) !important;
+  border-color: #475569 !important;
+}
+
+html[data-theme="dark"] .modal-panel {
+  background-color: var(--bind-surface) !important;
+  border-color: var(--bind-border) !important;
+}
+
+html[data-theme="dark"] .divide-black > :not([hidden]) ~ :not([hidden]),
+html[data-theme="dark"] .divide-y.divide-black {
+  border-color: var(--bind-border);
+}
+
+html[data-theme="dark"] .hover\:bg-slate-50:hover {
+  background-color: var(--bind-surface-muted) !important;
+}
+
+html[data-theme="dark"] .min-h-screen.bg-white,
+html[data-theme="dark"] .min-h-screen.bg-slate-50 {
+  background-color: var(--bind-bg) !important;
+}

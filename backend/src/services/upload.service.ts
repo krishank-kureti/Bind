@@ -2,6 +2,7 @@ import { createReadStream, existsSync } from 'fs';
 import { unlink } from 'fs/promises';
 import { prisma } from '../config/prisma.js';
 import { uploadFile as driveUploadFile } from './drive.service.js';
+import { invalidateFileListCache } from '../utils/cache.js';
 import { logger } from '../utils/logger.js';
 
 export async function processUpload(jobId: string, tempPath: string): Promise<void> {
@@ -12,20 +13,14 @@ export async function processUpload(jobId: string, tempPath: string): Promise<vo
   }
 
   try {
-    logger.info("STEP 1");
-
     await prisma.uploadJob.update({
       where: { id: jobId },
       data: { status: 'UPLOADING', progress: 10 },
     });
 
-    logger.info("STEP 2");
-
     logger.info({ exists: existsSync(tempPath), tempPath }, 'File existence check');
 
     const stream = createReadStream(tempPath);
-
-    logger.info("STEP 3");
 
     const result = await Promise.race([
       driveUploadFile(
@@ -36,11 +31,9 @@ export async function processUpload(jobId: string, tempPath: string): Promise<vo
         job.targetFolderId ?? undefined,
       ),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Google upload timeout")), 30000)
+        setTimeout(() => reject(new Error('Google upload timeout')), 30000),
       ),
     ]);
-
-    logger.info("STEP 4");
 
     await prisma.uploadJob.update({
       where: { id: jobId },
@@ -51,7 +44,51 @@ export async function processUpload(jobId: string, tempPath: string): Promise<vo
       },
     });
 
-    logger.info("STEP 5");
+    // Real-time FileIndex so listings update without waiting for full re-sync
+    if (result.id) {
+      const parentId = result.parents?.[0] ?? job.targetFolderId ?? null;
+      await prisma.fileIndex.upsert({
+        where: {
+          accountId_providerId: {
+            accountId: job.targetAccountId,
+            providerId: result.id,
+          },
+        },
+        create: {
+          accountId: job.targetAccountId,
+          providerId: result.id,
+          name: result.name ?? job.fileName,
+          mimeType: result.mimeType ?? job.mimeType,
+          size: result.size ? BigInt(result.size) : job.sizeBytes,
+          isFolder: (result.mimeType ?? job.mimeType) === 'application/vnd.google-apps.folder',
+          isTrashed: false,
+          parentFolderId: parentId,
+          webViewLink: result.webViewLink ?? null,
+          webContentLink: result.webContentLink ?? null,
+          starred: false,
+          isOwned: true,
+        },
+        update: {
+          name: result.name ?? job.fileName,
+          mimeType: result.mimeType ?? job.mimeType,
+          size: result.size ? BigInt(result.size) : job.sizeBytes,
+          parentFolderId: parentId,
+          webViewLink: result.webViewLink ?? null,
+          webContentLink: result.webContentLink ?? null,
+          isTrashed: false,
+          isOwned: true,
+        },
+      });
+
+      await prisma.$executeRaw`
+        UPDATE file_index
+        SET "searchVector" = to_tsvector('english', COALESCE(name, ''))
+        WHERE "accountId" = ${job.targetAccountId}
+          AND "providerId" = ${result.id}
+      `;
+
+      await invalidateFileListCache(job.userId);
+    }
 
     await unlink(tempPath).catch(() => {});
   } catch (err) {

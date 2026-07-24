@@ -4,7 +4,7 @@ import { apiFetch } from "../api";
 
 const faqs = [
   { q: 'How do I connect a Google Drive account?', a: 'Navigate to Accounts → Add Account. You will be redirected to Google OAuth to authorize access to your Drive files.' },
-  { q: 'How often does my file index sync?', a: 'Sync runs every 30 minutes automatically per account. You may also trigger a manual sync from the Accounts tab.' },
+  { q: 'How often does my file index sync?', a: 'A full re-index runs automatically about every 30 minutes per account. Uploads and deletes update the index immediately. You can also trigger a manual sync from the Accounts tab or Dashboard.' },
   { q: 'What happens when I disconnect an account?', a: 'All cached file data and storage records are deleted. The connection to Google Drive is revoked.' },
   { q: 'How does duplicate detection work?', a: 'Files are grouped by MD5 checksum. For Google-native files (Docs/Sheets) without checksums, we compare normalized names.' },
   { q: 'Is my data encrypted?', a: 'OAuth tokens are encrypted at rest using AES-256-GCM. Data in transit uses HTTPS. File content stays in Google Drive.' },

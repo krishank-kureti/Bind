@@ -37,17 +37,36 @@ router.post('/', upload.single('file'), async (req: Request, res: Response, next
     }
 
     const targetFolderId = req.body.folderId as string | undefined;
+    const requestedAccountId = (req.body.accountId as string | undefined)?.trim() || undefined;
 
-    const bestAccount = await selectBestAccountForUpload(userId);
-    if (!bestAccount) {
-      res.status(400).json({ success: false, error: { code: 'NO_ACCOUNT', message: 'No available account for upload' } });
-      return;
+    let targetAccountId: string | null = null;
+
+    if (requestedAccountId) {
+      const owned = await prisma.connectedAccount.findFirst({
+        where: { id: requestedAccountId, userId, isActive: true },
+        select: { id: true },
+      });
+      if (!owned) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_ACCOUNT', message: 'Target account not found or inactive' },
+        });
+        return;
+      }
+      targetAccountId = owned.id;
+    } else {
+      const bestAccount = await selectBestAccountForUpload(userId);
+      if (!bestAccount) {
+        res.status(400).json({ success: false, error: { code: 'NO_ACCOUNT', message: 'No available account for upload' } });
+        return;
+      }
+      targetAccountId = bestAccount.id;
     }
 
     const uploadJob = await prisma.uploadJob.create({
       data: {
         userId,
-        targetAccountId: bestAccount.id,
+        targetAccountId,
         fileName: req.file.originalname,
         mimeType: req.file.mimetype,
         sizeBytes: BigInt(req.file.size),
@@ -56,7 +75,7 @@ router.post('/', upload.single('file'), async (req: Request, res: Response, next
       },
     });
 
-    logger.info({ jobId: uploadJob.id, accountId: bestAccount.id, fileName: req.file.originalname }, 'Upload started');
+    logger.info({ jobId: uploadJob.id, accountId: targetAccountId, fileName: req.file.originalname }, 'Upload started');
 
     await processUpload(uploadJob.id, req.file.path);
 
@@ -72,6 +91,7 @@ router.post('/', upload.single('file'), async (req: Request, res: Response, next
         fileName: req.file.originalname,
         fileSize: req.file.size,
         resultFileId: completedJob?.resultFileId ?? null,
+        targetAccountId,
         errorMessage: completedJob?.errorMessage ?? null,
       },
     });

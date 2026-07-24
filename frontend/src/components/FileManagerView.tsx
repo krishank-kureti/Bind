@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { CloudFile, CloudAccount } from "../types";
-import { Folder, FileText, Image, FileArchive, Star, Trash2, Upload, Shield, ChevronRight, File, Music, MoreHorizontal, Edit3, Copy, Move, X, Check, CreditCard, RotateCw, RefreshCw } from "lucide-react";
+import { Folder, FileText, Image, FileArchive, Star, Trash2, Upload, Shield, ChevronRight, File, Music, MoreHorizontal, Edit3, Copy, Move, X, Check, CreditCard, RotateCw, RefreshCw, ExternalLink } from "lucide-react";
 import { apiFetch } from "../api";
 
 interface FileManagerViewProps {
@@ -278,6 +278,21 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
     setFolderBreadcrumb((prev) => [...prev, { id: folder.providerId, name: folder.name }]);
   };
 
+  const openFileInGoogle = (file: CloudFile) => {
+    if (file.isFolder) {
+      handleFolderClick(file);
+      return;
+    }
+    const url =
+      file.webViewLink ||
+      (file.providerId ? `https://drive.google.com/file/d/${file.providerId}/view` : null);
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } else {
+      showToast('No Google Drive link available for this file', 'error');
+    }
+  };
+
   const handleBreadcrumbClick = (index: number) => {
     if (index === 0) {
       setNavigatedFolderId(null);
@@ -452,8 +467,8 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
           ) : (
             <div className="divide-y divide-black relative">
               {sortedFiles.map((file) => (
-                <div key={file.id} className="h-12 flex items-center px-6 text-xs hover:bg-slate-50 transition-colors">
-                  <div className="w-8 shrink-0 flex items-center" onClick={() => file.isFolder && handleFolderClick(file)}>
+                <div key={file.id} className="h-12 flex items-center px-6 text-xs hover:bg-slate-50 transition-colors group">
+                  <div className="w-8 shrink-0 flex items-center cursor-pointer" onClick={() => openFileInGoogle(file)}>
                     {getFileIcon(file)}
                   </div>
                   <div className="flex-1 min-w-[200px] flex items-center gap-3 pr-4 truncate font-bold">
@@ -471,11 +486,15 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
                       </div>
                     ) : (
                       <>
-                        <span className={`text-black truncate ${file.isFolder ? 'cursor-pointer hover:text-blue-600' : ''}`}
-                          onClick={() => file.isFolder && handleFolderClick(file)}>
+                        <span
+                          className="text-black truncate cursor-pointer hover:text-blue-600"
+                          title={file.isFolder ? 'Open folder' : 'Open in Google Drive'}
+                          onClick={() => openFileInGoogle(file)}
+                        >
                           {file.name}
                         </span>
                         {file.starred && <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />}
+                        {!file.isFolder && <ExternalLink className="w-3 h-3 text-slate-400 shrink-0 opacity-0 group-hover:opacity-100" />}
                       </>
                     )}
                   </div>
@@ -527,6 +546,14 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
         if (!file) return null;
         return (
           <div ref={menuRef} className="fixed z-50 bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] w-44 py-1" style={{ top: menuPosition.top, left: menuPosition.left }}>
+            {!file.isFolder && (
+              <button
+                onClick={() => { openFileInGoogle(file); setOpenMenuFileId(null); setMenuPosition(null); }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-semibold tracking-normal hover:bg-slate-50 text-left"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-slate-400" /> Open in Drive
+              </button>
+            )}
             <button onClick={() => handleToggleStar(file.id)} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-semibold tracking-normal hover:bg-slate-50 text-left">
               <Star className={`w-3.5 h-3.5 ${file.starred ? 'text-amber-500 fill-amber-500' : 'text-slate-400'}`} /> {file.starred ? 'Unstar' : 'Star'}
             </button>

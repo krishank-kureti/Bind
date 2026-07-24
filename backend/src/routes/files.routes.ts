@@ -3,7 +3,6 @@ import { requireAuth } from '../middleware/auth.middleware.js';
 import { prisma } from '../config/prisma.js';
 import { redis } from '../config/redis.js';
 import { createHash } from 'node:crypto';
-import { indexAccount } from '../services/index.service.js';
 import {
   downloadFile,
   uploadFile as driveUpload,
@@ -16,6 +15,7 @@ import {
   copyFile as driveCopy,
   createDriveFolder,
 } from '../services/drive.service.js';
+import { invalidateFileListCache } from '../utils/cache.js';
 import type { Prisma } from '../generated/prisma/client.js';
 
 const router = Router();
@@ -70,6 +70,7 @@ router.post('/batch/trash', async (req: Request, res: Response, next: NextFuncti
       }
     }
 
+    await invalidateFileListCache(userId);
     res.json({ success: true, data: results });
   } catch (err) {
     next(err);
@@ -98,6 +99,7 @@ router.post('/batch/restore', async (req: Request, res: Response, next: NextFunc
       }
     }
 
+    await invalidateFileListCache(userId);
     res.json({ success: true, data: results });
   } catch (err) {
     next(err);
@@ -126,6 +128,7 @@ router.post('/batch/delete', async (req: Request, res: Response, next: NextFunct
       }
     }
 
+    await invalidateFileListCache(userId);
     res.json({ success: true, data: results });
   } catch (err) {
     next(err);
@@ -154,6 +157,7 @@ router.post('/batch/move', async (req: Request, res: Response, next: NextFunctio
       }
     }
 
+    await invalidateFileListCache(userId);
     res.json({ success: true, data: results });
   } catch (err) {
     next(err);
@@ -380,6 +384,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       include: { account: accountSelect },
     });
 
+    await invalidateFileListCache(userId);
     res.status(201).json({ success: true, data: fileIndex });
   } catch (err) {
     if (isPermissionError(err)) {
@@ -415,6 +420,7 @@ router.patch('/:fileId/rename', async (req: Request, res: Response, next: NextFu
       include: { account: accountSelect },
     });
 
+    await invalidateFileListCache(userId);
     res.json({ success: true, data: updated });
   } catch (err) {
     if (isPermissionError(err)) {
@@ -450,6 +456,7 @@ router.patch('/:fileId/move', async (req: Request, res: Response, next: NextFunc
       include: { account: accountSelect },
     });
 
+    await invalidateFileListCache(userId);
     res.json({ success: true, data: updated });
   } catch (err) {
     if (isPermissionError(err)) {
@@ -480,6 +487,7 @@ router.patch('/:fileId/star', async (req: Request, res: Response, next: NextFunc
       include: { account: accountSelect },
     });
 
+    await invalidateFileListCache(userId);
     res.json({ success: true, data: updated });
   } catch (err) {
     if (isPermissionError(err)) {
@@ -508,10 +516,12 @@ router.post('/:fileId/trash', async (req: Request, res: Response, next: NextFunc
         data: { isTrashed: true },
         include: { account: accountSelect },
       });
+      await invalidateFileListCache(userId);
       res.json({ success: true, data: updated });
     } else {
       await permanentlyDeleteFile(owned.account.id, owned.file.providerId);
       await prisma.fileIndex.delete({ where: { id: fileId } });
+      await invalidateFileListCache(userId);
       res.json({ success: true, data: { id: fileId, action: 'removed', message: 'Shared file removed from Drive view' } });
     }
   } catch (err) {
@@ -542,6 +552,7 @@ router.post('/:fileId/restore', async (req: Request, res: Response, next: NextFu
       include: { account: accountSelect },
     });
 
+    await invalidateFileListCache(userId);
     res.json({ success: true, data: updated });
   } catch (err) {
     if (isPermissionError(err)) {
@@ -566,6 +577,7 @@ router.delete('/:fileId', async (req: Request, res: Response, next: NextFunction
     await permanentlyDeleteFile(owned.account.id, owned.file.providerId);
     await prisma.fileIndex.delete({ where: { id: fileId } });
 
+    await invalidateFileListCache(userId);
     res.json({ success: true, data: { id: fileId, deleted: true } });
   } catch (err) {
     if (isPermissionError(err)) {
@@ -608,6 +620,7 @@ router.post('/:fileId/copy', async (req: Request, res: Response, next: NextFunct
       include: { account: accountSelect },
     });
 
+    await invalidateFileListCache(userId);
     res.status(201).json({ success: true, data: fileIndex });
   } catch (err) {
     if (isPermissionError(err)) {
@@ -670,6 +683,7 @@ router.post('/:fileId/move-across', async (req: Request, res: Response, next: Ne
 
     await prisma.fileIndex.delete({ where: { id: fileId } });
 
+    await invalidateFileListCache(userId);
     res.json({ success: true, data: fileIndex });
   } catch (err) {
     if (isPermissionError(err)) {
