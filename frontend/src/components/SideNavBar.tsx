@@ -81,12 +81,15 @@ export default function SideNavBar({ currentTab, setCurrentTab, onOpenConnectMod
         </div>
       </nav>
 
-      <div className="p-4 border-t border-black bg-slate-50">
+      <div className="p-4 border-t border-black bg-slate-50 sidebar-grid-storage">
         <div className="px-1 mb-1 flex items-center justify-between">
           <span className="text-[9px] font-semibold text-slate-400 tracking-normal ">Global Grid Storage</span>
           <span className="text-[8px] font-mono font-bold text-slate-500">{usagePercent}%</span>
         </div>
-        <div className="border border-black h-4 w-full bg-slate-200 overflow-hidden relative" title={`${usedLabel} / ${totalLabel}`}>
+        <div
+          className="border border-black h-4 w-full bg-slate-200 overflow-hidden relative storage-track"
+          title={`${usedLabel} / ${totalLabel}`}
+        >
           <div className="h-full geo-stripes" style={{ width: `${usagePercent}%` }} />
         </div>
         <div className="text-[7px] text-right text-slate-400 mt-0.5 tracking-tighter" title="Combined across connected accounts">

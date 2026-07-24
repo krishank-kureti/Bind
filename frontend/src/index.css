@@ -365,11 +365,16 @@ html[data-theme="dark"] {
   --bind-surface-muted: #1c2430;
   --bind-text: #f1f5f9;
   --bind-text-muted: #94a3b8;
-  --bind-border: #e2e8f0;
-  --bind-shadow: #3b82f6;
+  --bind-border: #334155;
+  /* Soft offset shadow — deep navy, not bright blue (dark mode only) */
+  --bind-shadow: #0f2744;
+  --bind-shadow-accent: #163556;
   --bind-accent: #60a5fa;
   --bind-panel-header: #0f172a;
   --bind-panel-header-text: #f8fafc;
+  --bind-track: #0f172a;
+  --bind-stripe-a: #1e3a5f;
+  --bind-stripe-b: #1a3354;
   color-scheme: dark;
 }
 
@@ -451,31 +456,89 @@ html[data-theme="dark"] .bg-amber-100 {
   color: var(--bind-text);
 }
 
-html[data-theme="dark"] .shadow-\[4px_4px_0px_rgba\(0\,0\,0\,1\)\],
-html[data-theme="dark"] .shadow-\[4px_4px_0px_0px_rgba\(0\,0\,0\,1\)\],
-html[data-theme="dark"] .shadow-\[6px_6px_0px_rgba\(0\,0\,0\,1\)\],
-html[data-theme="dark"] .shadow-\[8px_8px_0px_rgba\(0\,0\,0\,1\)\] {
-  box-shadow: 4px 4px 0px 0px var(--bind-shadow) !important;
+/*
+ * Dark mode: recolor flat neo-brutalist offsets.
+ * Matches any Tailwind arbitrary shadow-[…#3b82f6] or rgba(0,0,0) utility
+ * without listing every size variant. Light mode is untouched.
+ */
+html[data-theme="dark"] [class*="shadow-["] {
+  --tw-shadow-color: var(--bind-shadow);
+  box-shadow: 4px 4px 0 0 var(--bind-shadow) !important;
+}
+
+/* Smaller accent offsets (nav pills / tabs / logo) keep a slightly softer navy */
+html[data-theme="dark"] aside [class*="shadow-["],
+html[data-theme="dark"] [class*="#3b82f6"] {
+  box-shadow: 3px 3px 0 0 var(--bind-shadow-accent) !important;
+}
+
+html[data-theme="dark"] [class*="hover:shadow-["]:hover {
+  box-shadow: 6px 6px 0 0 var(--bind-shadow) !important;
+}
+
+html[data-theme="dark"] [class*="active:shadow-["]:active {
+  box-shadow: 2px 2px 0 0 var(--bind-shadow) !important;
 }
 
 html[data-theme="dark"] .geo-btn-primary {
   background-color: var(--bind-accent);
   color: #0b0f14;
   border-color: var(--bind-border);
-  box-shadow: 3px 3px 0px 0px #000000;
+  box-shadow: 3px 3px 0px 0px var(--bind-shadow-accent);
+}
+
+html[data-theme="dark"] .geo-btn-primary:hover {
+  box-shadow: 4px 4px 0px 0px var(--bind-shadow-accent);
+}
+
+html[data-theme="dark"] .geo-btn-primary:active {
+  box-shadow: 1px 1px 0px 0px var(--bind-shadow-accent);
 }
 
 html[data-theme="dark"] .geo-btn-secondary {
   background-color: var(--bind-surface);
   color: var(--bind-text);
   border-color: var(--bind-border);
-  box-shadow: 3px 3px 0px 0px var(--bind-accent);
+  box-shadow: 3px 3px 0px 0px var(--bind-shadow);
+}
+
+html[data-theme="dark"] .geo-btn-secondary:hover {
+  box-shadow: 4px 4px 0px 0px var(--bind-shadow);
+}
+
+html[data-theme="dark"] .geo-btn-secondary:active {
+  box-shadow: 1px 1px 0px 0px var(--bind-shadow);
 }
 
 html[data-theme="dark"] .geo-cell {
   background-color: var(--bind-surface);
   border-color: var(--bind-border);
   box-shadow: 4px 4px 0px 0px var(--bind-shadow);
+}
+
+/* Global Grid Storage + progress stripes in dark mode */
+html[data-theme="dark"] .geo-stripes {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--bind-stripe-a),
+    var(--bind-stripe-a) 10px,
+    var(--bind-stripe-b) 10px,
+    var(--bind-stripe-b) 20px
+  );
+}
+
+html[data-theme="dark"] aside .bg-slate-200 {
+  background-color: var(--bind-track) !important;
+}
+
+html[data-theme="dark"] .sidebar-grid-storage {
+  background-color: var(--bind-surface-muted) !important;
+  border-color: var(--bind-border) !important;
+}
+
+html[data-theme="dark"] .sidebar-grid-storage .storage-track {
+  background-color: var(--bind-track) !important;
+  border-color: var(--bind-border) !important;
 }
 
 html[data-theme="dark"] input,
