@@ -87,13 +87,15 @@ export default function DashboardView({ accounts, files, onOpenUploadModal, isSy
             );
           })}
         </div>
-        <div className="flex flex-wrap gap-x-5 gap-y-2">
+        <div className="flex flex-wrap gap-x-5 gap-y-2 account-legend">
           {accounts.map((a) => {
             const pct = totalQuota > 0 ? ((a.quotaUsed / totalQuota) * 100).toFixed(0) : '0';
             return (
               <div key={a.id} className="flex items-center gap-2">
                 <span className="w-3 h-3 border border-black shrink-0 shadow-[1px_1px_0px_rgba(0,0,0,1)]" style={{ backgroundColor: a.color }} />
-                <span className="text-[11px] font-mono font-semibold text-slate-800">{a.email.split('@')[0]} ({pct}%)</span>
+                <span className="text-[11px] font-mono font-semibold text-slate-800 account-legend-label">
+                  {a.email.split('@')[0]} ({pct}%)
+                </span>
               </div>
             );
           })}

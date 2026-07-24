@@ -499,9 +499,12 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
                     )}
                   </div>
                   <div className="w-44 hidden sm:flex items-center">
-                    <span className="px-2 py-1 text-[9.5px] font-semibold flex items-center gap-1.5 border border-black tracking-normal" style={{ backgroundColor: `${getAccountColor(file.accountEmail)}15` }}>
+                    <span
+                      className="px-2 py-1 text-[9.5px] font-semibold flex items-center gap-1.5 border border-black tracking-normal account-source-tag"
+                      style={{ backgroundColor: `${getAccountColor(file.accountEmail)}22` }}
+                    >
                       <span className="w-2 h-2 border border-black shrink-0" style={{ backgroundColor: getAccountColor(file.accountEmail) }} />
-                      <span className="truncate max-w-[124px] ">{file.accountEmail?.split('@')[0] || 'SYS'}</span>
+                      <span className="truncate max-w-[124px] account-legend-label">{file.accountEmail?.split('@')[0] || 'SYS'}</span>
                     </span>
                   </div>
                   <div className="w-24 text-right font-semibold text-slate-800 text-[11px]">

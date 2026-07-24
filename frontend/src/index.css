@@ -445,6 +445,24 @@ html[data-theme="dark"] .text-slate-600 {
   color: var(--bind-text-muted) !important;
 }
 
+/* Near-black slate utilities are unreadable on dark surfaces */
+html[data-theme="dark"] .text-slate-700,
+html[data-theme="dark"] .text-slate-800,
+html[data-theme="dark"] .text-slate-900 {
+  color: var(--bind-text) !important;
+}
+
+/* Account legend / tags under storage bars + file source chips */
+html[data-theme="dark"] .account-legend-label {
+  color: #e2e8f0 !important;
+}
+
+html[data-theme="dark"] .account-source-tag {
+  background-color: var(--bind-surface-muted) !important;
+  border-color: var(--bind-border) !important;
+  color: #e2e8f0 !important;
+}
+
 html[data-theme="dark"] .bg-slate-50,
 html[data-theme="dark"] .bg-slate-100 {
   background-color: var(--bind-surface-muted) !important;
