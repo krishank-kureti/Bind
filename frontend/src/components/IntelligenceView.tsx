@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { CloudAccount, CloudFile, DuplicateGroup } from "../types";
-import { ShieldAlert, RefreshCw, FileText, CheckSquare, Trash2 } from "lucide-react";
+import { RefreshCw, FileText, CheckSquare, Trash2, ExternalLink } from "lucide-react";
 import { apiFetch } from "../api";
 
 interface IntelligenceViewProps {
@@ -33,6 +33,17 @@ function transformGroup(g: any): DuplicateGroup {
   };
 }
 
+function openInGoogle(file: { webViewLink?: string | null; providerId?: string | null; name?: string | null }) {
+  const url =
+    file.webViewLink ||
+    (file.providerId ? `https://drive.google.com/file/d/${file.providerId}/view` : null);
+  if (url) {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  } else {
+    alert(`No Google Drive link available for ${file.name || 'this file'}.`);
+  }
+}
+
 export default function IntelligenceView({ accounts, files, onRefreshAllData }: IntelligenceViewProps) {
   const [dupGroups, setDupGroups] = useState<DuplicateGroup[]>([]);
   const [loading, setLoading] = useState(false);
@@ -55,8 +66,6 @@ export default function IntelligenceView({ accounts, files, onRefreshAllData }: 
     setLoading(true);
     try {
       await apiFetch('/api/duplicates/scan', { method: 'POST' });
-      // Wait a bit for the scan to complete, then reload
-      await new Promise((r) => setTimeout(r, 3000));
       await fetchDuplicates();
       onRefreshAllData();
     } catch (e) {
@@ -71,7 +80,11 @@ export default function IntelligenceView({ accounts, files, onRefreshAllData }: 
   const handleResolve = async (groupId: string) => {
     setResolving(groupId);
     try {
-      const res = await apiFetch(`/api/duplicates/${groupId}/resolve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+      const res = await apiFetch(`/api/duplicates/${groupId}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
       if (res.ok) {
         const body = await res.json();
         if (body.data?.partial) {
@@ -80,6 +93,9 @@ export default function IntelligenceView({ accounts, files, onRefreshAllData }: 
         }
         await fetchDuplicates();
         onRefreshAllData();
+      } else {
+        const body = await res.json().catch(() => ({}));
+        alert(body.error?.message || 'Failed to resolve duplicate group');
       }
     } catch (e) {
       console.error('Resolve failed', e);
@@ -106,8 +122,8 @@ export default function IntelligenceView({ accounts, files, onRefreshAllData }: 
             </div>
             <p className="text-[12px] text-slate-500 font-bold tracking-normal">
               {totalWasted > 0
-                ? `${formatBytes(totalWasted, 1)} of recoverable storage across ${dupGroups.length} duplicate cluster${dupGroups.length > 1 ? 's' : ''}.`
-                : 'All storage is optimized — no duplicates detected.'}
+                ? `${formatBytes(totalWasted, 1)} of recoverable storage across ${dupGroups.length} duplicate cluster${dupGroups.length > 1 ? 's' : ''}. Only owned files are included.`
+                : 'All storage is optimized — no owned duplicates detected.'}
             </p>
           </div>
         </div>
@@ -145,15 +161,34 @@ export default function IntelligenceView({ accounts, files, onRefreshAllData }: 
                 </div>
                 <div className="space-y-1.5">
                   {g.duplicateFiles.map((df) => (
-                    <div key={df.id} className="h-10 bg-white border-2 border-black px-4 flex items-center justify-between text-xs">
-                      <span className="text-slate-800 text-[11px] font-bold truncate">{df.file?.name || 'Unknown'}</span>
-                      <span className="text-[9.5px] bg-black text-white border border-black font-semibold px-2 py-0.5 shrink-0 ml-3">{df.account?.email?.split('@')[0] || 'SYS'}</span>
-                    </div>
+                    <button
+                      key={df.id}
+                      type="button"
+                      onClick={() => openInGoogle(df.file)}
+                      title="Open in Google Drive"
+                      className="w-full h-10 bg-white border-2 border-black px-4 flex items-center justify-between text-xs hover:bg-blue-50 transition-colors group text-left"
+                    >
+                      <span className="text-slate-800 text-[11px] font-bold truncate account-legend-label flex items-center gap-2 min-w-0">
+                        <ExternalLink className="w-3 h-3 text-slate-400 shrink-0 opacity-60 group-hover:text-blue-600 group-hover:opacity-100" />
+                        <span className="truncate group-hover:text-blue-600">{df.file?.name || 'Unknown'}</span>
+                      </span>
+                      <span className="text-[9.5px] bg-black text-white border border-black font-semibold px-2 py-0.5 shrink-0 ml-3">
+                        {df.account?.email?.split('@')[0] || 'SYS'}
+                      </span>
+                    </button>
                   ))}
                 </div>
                 <div className="flex justify-end pt-3">
-                  <button onClick={() => handleResolve(g.id)} disabled={resolving === g.id} className="px-4 py-2 bg-white border-2 border-black text-red-600 hover:bg-red-50 text-[11px] font-semibold shadow-[3px_3px_0px_rgba(0,0,0,1)] active:translate-y-0.5 transition-all flex items-center gap-1.5 tracking-normal">
-                    {resolving === g.id ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Resolving...</> : <><Trash2 className="w-3.5 h-3.5" /> Resolve & Reclaim</>}
+                  <button
+                    onClick={() => handleResolve(g.id)}
+                    disabled={resolving === g.id}
+                    className="px-4 py-2 bg-white border-2 border-black text-red-600 hover:bg-red-50 text-[11px] font-semibold shadow-[3px_3px_0px_rgba(0,0,0,1)] active:translate-y-0.5 transition-all flex items-center gap-1.5 tracking-normal"
+                  >
+                    {resolving === g.id ? (
+                      <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Resolving...</>
+                    ) : (
+                      <><Trash2 className="w-3.5 h-3.5" /> Resolve & Reclaim</>
+                    )}
                   </button>
                 </div>
               </div>

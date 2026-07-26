@@ -61,7 +61,25 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       },
     });
 
-    res.json({ success: true, data: groups });
+    // Only surface owned copies (shared files cannot be deleted on resolve)
+    const ownedOnly = groups
+      .map((g) => {
+        const ownedFiles = g.duplicateFiles.filter((df) => df.file?.isOwned === true);
+        return {
+          ...g,
+          duplicateFiles: ownedFiles,
+          fileCount: ownedFiles.length,
+          totalWaste:
+            ownedFiles.length >= 2 && g.fileSize != null
+              ? BigInt(g.fileSize) * BigInt(ownedFiles.length - 1)
+              : ownedFiles.length >= 2
+                ? g.totalWaste
+                : 0n,
+        };
+      })
+      .filter((g) => g.duplicateFiles.length >= 2);
+
+    res.json({ success: true, data: ownedOnly });
   } catch (err) {
     next(err);
   }
@@ -140,9 +158,24 @@ router.post('/:id/resolve', async (req: Request, res: Response, next: NextFuncti
       return;
     }
 
-    const toRemove = keepFileId
-      ? group.duplicateFiles.filter((df) => df.fileId !== keepFileId)
-      : group.duplicateFiles.slice(1);
+    // Only owned files are eligible for resolve (shared cannot be permanently deleted by us)
+    const ownedDups = group.duplicateFiles.filter((df) => df.file?.isOwned);
+    if (ownedDups.length < 2) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'NO_OWNED_DUPLICATES',
+          message: 'Need at least two owned copies to resolve. Shared files are excluded.',
+        },
+      });
+      return;
+    }
+
+    const keepId = keepFileId && ownedDups.some((df) => df.fileId === keepFileId)
+      ? keepFileId
+      : ownedDups[0]!.fileId;
+
+    const toRemove = ownedDups.filter((df) => df.fileId !== keepId);
 
     if (toRemove.length === 0) {
       res.json({ success: true, data: { message: 'No files to remove', removed: [] } });
@@ -160,19 +193,11 @@ router.post('/:id/resolve', async (req: Request, res: Response, next: NextFuncti
           where: { groupId, fileId: fileIndexRecord.id },
         });
 
-        if (fileIndexRecord.isOwned) {
-          await permanentlyDeleteFile(fileIndexRecord.accountId, fileIndexRecord.providerId).catch((driveErr: unknown) => {
-            if (!isFileNotFound(driveErr)) throw driveErr;
-          });
-          await prisma.fileIndex.delete({ where: { id: fileIndexRecord.id } });
-          results.push({ fileId: fileIndexRecord.id, action: 'permanently_deleted', success: true });
-        } else {
-          await permanentlyDeleteFile(fileIndexRecord.accountId, fileIndexRecord.providerId).catch((driveErr: unknown) => {
-            if (!isFileNotFound(driveErr)) throw driveErr;
-          });
-          await prisma.fileIndex.delete({ where: { id: fileIndexRecord.id } });
-          results.push({ fileId: fileIndexRecord.id, action: 'removed_from_drive', success: true });
-        }
+        await permanentlyDeleteFile(fileIndexRecord.accountId, fileIndexRecord.providerId).catch((driveErr: unknown) => {
+          if (!isFileNotFound(driveErr)) throw driveErr;
+        });
+        await prisma.fileIndex.delete({ where: { id: fileIndexRecord.id } });
+        results.push({ fileId: fileIndexRecord.id, action: 'permanently_deleted', success: true });
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
         logger.warn({ fileId: df.fileId, err }, 'Failed to remove duplicate file');

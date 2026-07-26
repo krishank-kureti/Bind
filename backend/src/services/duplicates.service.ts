@@ -18,11 +18,13 @@ function normalizeName(name: string): string {
 export async function scanDuplicates(userId: string): Promise<{ groupsCreated: number; wasteBytes: bigint }> {
   logger.info({ userId }, 'Starting duplicate scan');
 
+  // Only owned files — shared files cannot be deleted on resolve
   const allFiles = await prisma.fileIndex.findMany({
     where: {
       account: { userId, isActive: true },
       isFolder: false,
       isTrashed: false,
+      isOwned: true,
     },
     select: {
       id: true,
