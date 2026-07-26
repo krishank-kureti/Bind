@@ -39,6 +39,14 @@ function isPermissionError(err: unknown): boolean {
   return gaxiosErr?.response?.status === 403 || gaxiosErr?.code === 403;
 }
 
+function isFileNotFound(err: unknown): boolean {
+  if (err && typeof err === 'object') {
+    if ('code' in err && (err as { code?: number }).code === 404) return true;
+    if ('response' in err && (err as { response?: { status?: number } }).response?.status === 404) return true;
+  }
+  return false;
+}
+
 function permissionDenied(res: Response) {
   res.status(403).json({ success: false, error: { code: 'PERMISSION_DENIED', message: 'You do not have permission to modify this file' } });
 }
@@ -519,10 +527,30 @@ router.post('/:fileId/trash', async (req: Request, res: Response, next: NextFunc
       await invalidateFileListCache(userId);
       res.json({ success: true, data: updated });
     } else {
-      await permanentlyDeleteFile(owned.account.id, owned.file.providerId);
+      // Shared: remove from user's Drive view when possible; always drop from our index
+      // so "Remove from personal list" works even without delete permission on the file.
+      let driveRemoved = false;
+      try {
+        await permanentlyDeleteFile(owned.account.id, owned.file.providerId);
+        driveRemoved = true;
+      } catch (err) {
+        if (!isPermissionError(err) && !isFileNotFound(err)) {
+          throw err;
+        }
+      }
       await prisma.fileIndex.delete({ where: { id: fileId } });
       await invalidateFileListCache(userId);
-      res.json({ success: true, data: { id: fileId, action: 'removed', message: 'Shared file removed from Drive view' } });
+      res.json({
+        success: true,
+        data: {
+          id: fileId,
+          action: 'removed',
+          driveRemoved,
+          message: driveRemoved
+            ? 'Shared file removed from Drive view'
+            : 'Shared file removed from your list (Drive delete not permitted)',
+        },
+      });
     }
   } catch (err) {
     if (isPermissionError(err)) {

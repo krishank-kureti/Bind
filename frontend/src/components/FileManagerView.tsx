@@ -85,11 +85,37 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
   const [moveTargetFolderId, setMoveTargetFolderId] = useState<string | null>(null);
   const [allFolders, setAllFolders] = useState<CloudFile[]>([]);
   const [syncNotification, setSyncNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [sharedDeleteFile, setSharedDeleteFile] = useState<CloudFile | null>(null);
+  const [sharedDeleteLoading, setSharedDeleteLoading] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const MENU_WIDTH = 176;
+  const MENU_HEIGHT_EST = 280;
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setSyncNotification({ message, type });
     setTimeout(() => setSyncNotification(null), 4000);
+  };
+
+  const positionMenu = (rect: DOMRect) => {
+    const pad = 8;
+    let left = rect.right - MENU_WIDTH;
+    let top = rect.bottom + 4;
+
+    if (left < pad) left = pad;
+    if (left + MENU_WIDTH > window.innerWidth - pad) {
+      left = Math.max(pad, window.innerWidth - MENU_WIDTH - pad);
+    }
+
+    if (top + MENU_HEIGHT_EST > window.innerHeight - pad) {
+      // Open upward when near the bottom of the viewport
+      top = Math.max(pad, rect.top - MENU_HEIGHT_EST - 4);
+    }
+    if (top + MENU_HEIGHT_EST > window.innerHeight - pad) {
+      top = Math.max(pad, window.innerHeight - MENU_HEIGHT_EST - pad);
+    }
+
+    setMenuPosition({ top, left });
   };
 
   const handleToggleStar = async (fileId: string) => {
@@ -101,13 +127,50 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
     if (!res.ok) { setLocalFiles(prev); showToast('Failed to update star', 'error'); }
   };
 
-  const handleDeleteFile = async (fileId: string) => {
-    const prev = localFiles;
-    setLocalFiles((p) => p.filter((f) => f.id !== fileId));
+  const requestTrashFile = (file: CloudFile) => {
     setOpenMenuFileId(null);
     setMenuPosition(null);
+    if (!file.isOwned) {
+      setSharedDeleteFile(file);
+      return;
+    }
+    void handleDeleteOwnedFile(file.id);
+  };
+
+  const handleDeleteOwnedFile = async (fileId: string) => {
+    const prev = localFiles;
+    setLocalFiles((p) => p.filter((f) => f.id !== fileId));
     const res = await apiFetch(`/api/files/${fileId}/trash`, { method: 'POST' });
-    if (!res.ok) { setLocalFiles(prev); showToast('Failed to trash file', 'error'); }
+    if (!res.ok) {
+      setLocalFiles(prev);
+      showToast('Failed to trash file', 'error');
+      return;
+    }
+    showToast('File deleted successfully', 'success');
+  };
+
+  const handleRemoveSharedFromList = async () => {
+    if (!sharedDeleteFile) return;
+    const fileId = sharedDeleteFile.id;
+    const prev = localFiles;
+    setSharedDeleteLoading(true);
+    setLocalFiles((p) => p.filter((f) => f.id !== fileId));
+    try {
+      const res = await apiFetch(`/api/files/${fileId}/trash`, { method: 'POST' });
+      if (!res.ok) {
+        setLocalFiles(prev);
+        const body = await res.json().catch(() => ({}));
+        showToast(body.error?.message || 'Failed to remove shared file', 'error');
+      } else {
+        showToast('File removed from your list', 'success');
+      }
+    } catch {
+      setLocalFiles(prev);
+      showToast('Failed to remove shared file', 'error');
+    } finally {
+      setSharedDeleteLoading(false);
+      setSharedDeleteFile(null);
+    }
   };
 
   const handleRenameFile = async (fileId: string, name: string) => {
@@ -519,7 +582,7 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
                           setMenuPosition(null);
                         } else {
                           const rect = e.currentTarget.getBoundingClientRect();
-                          setMenuPosition({ top: rect.bottom + 4, left: rect.right - 176 });
+                          positionMenu(rect);
                           setOpenMenuFileId(file.id);
                         }
                       }}
@@ -548,7 +611,11 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
         const file = localFiles.find((f) => f.id === openMenuFileId);
         if (!file) return null;
         return (
-          <div ref={menuRef} className="fixed z-50 bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] w-44 py-1" style={{ top: menuPosition.top, left: menuPosition.left }}>
+          <div
+            ref={menuRef}
+            className="fixed z-50 bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] w-44 py-1 max-h-[min(280px,calc(100vh-16px))] overflow-y-auto"
+            style={{ top: menuPosition.top, left: menuPosition.left }}
+          >
             {!file.isFolder && (
               <button
                 onClick={() => { openFileInGoogle(file); setOpenMenuFileId(null); setMenuPosition(null); }}
@@ -570,7 +637,7 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
               <Move className="w-3.5 h-3.5 text-slate-400" /> Move
             </button>
             <div className="border-t border-black my-1" />
-            <button onClick={() => handleDeleteFile(file.id)} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-semibold tracking-normal hover:bg-red-50 text-red-600 text-left">
+            <button onClick={() => requestTrashFile(file)} className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-semibold tracking-normal hover:bg-red-50 text-red-600 text-left">
               <Trash2 className="w-3.5 h-3.5" /> Trash
             </button>
           </div>
@@ -581,6 +648,60 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
         <span>{total || sortedFiles.length} file{(total || sortedFiles.length) !== 1 ? 's' : ''} ({formatBytes(totalSize)} total)</span>
         <span className="flex items-center gap-1.5 text-blue-600"><Shield className="w-3.5 h-3.5" /> Encrypted</span>
       </div>
+
+      {sharedDeleteFile && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={() => !sharedDeleteLoading && setSharedDeleteFile(null)}>
+          <div
+            className="bg-white border-2 border-black shadow-[8px_8px_0px_rgba(0,0,0,1)] w-full max-w-md mx-4 relative modal-panel"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-black text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Trash2 className="w-5 h-5 text-red-400" />
+                <h2 className="font-extrabold text-[12px] tracking-normal">Shared File</h2>
+              </div>
+              <button
+                type="button"
+                disabled={sharedDeleteLoading}
+                onClick={() => setSharedDeleteFile(null)}
+                className="text-white hover:text-slate-300 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-5">
+              <p className="text-[12px] text-slate-700 font-medium leading-relaxed account-legend-label">
+                This is a shared file and you don&apos;t have the permission to delete it.
+              </p>
+              <p className="text-[11px] text-slate-500 font-bold">
+                You can still remove <span className="text-black account-legend-label">{sharedDeleteFile.name}</span> from your personal list so it no longer appears in BIND.
+              </p>
+              <div className="flex justify-end gap-3 pt-1">
+                <button
+                  type="button"
+                  disabled={sharedDeleteLoading}
+                  onClick={() => setSharedDeleteFile(null)}
+                  className="px-4 py-2 border border-black bg-white text-slate-600 hover:bg-slate-50 text-[10px] font-semibold tracking-normal shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-0.5 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={sharedDeleteLoading}
+                  onClick={handleRemoveSharedFromList}
+                  className="geo-btn-primary text-[10px] flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {sharedDeleteLoading ? (
+                    <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Removing…</>
+                  ) : (
+                    <><Trash2 className="w-3.5 h-3.5" /> Remove from my list</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {moveDialogOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setMoveDialogOpen(false)}>

@@ -93,7 +93,7 @@ export default function AccountsView({ accounts, onOpenConnectModal, onRefreshAl
                   </div>
                   <div className="h-6 w-full bg-slate-100 border-2 border-black overflow-hidden">
                     <div className="h-full transition-all duration-300 flex items-center justify-end pr-2" style={{ width: `${pct}%`, backgroundColor: a.color }}>
-                      <span className="text-[9px] font-semibold text-white drop-shadow-[1px_1px_0_rgba(0,0,0,0.8)]">{pct.toFixed(0)}%</span>
+                      <span className="text-[9px] font-semibold text-white">{pct.toFixed(0)}%</span>
                     </div>
                   </div>
                 </div>
