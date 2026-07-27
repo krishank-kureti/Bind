@@ -1,7 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import { CloudFile, CloudAccount } from "../types";
-import { Folder, FileText, Image, FileArchive, Star, Trash2, Upload, Shield, ChevronRight, File, Music, MoreHorizontal, Edit3, Copy, Move, X, Check, CreditCard, RotateCw, RefreshCw, ExternalLink, List, LayoutGrid } from "lucide-react";
+import { Folder, FileText, Image, FileArchive, Star, Trash2, Upload, Shield, ChevronRight, File, Music, MoreHorizontal, Edit3, Copy, Move, X, Check, CreditCard, RotateCw, RefreshCw, ExternalLink, List, LayoutGrid, ArrowUpAZ, ArrowDownAZ, ArrowUpNarrowWide, ArrowDownWideNarrow } from "lucide-react";
 import { apiFetch } from "../api";
+
+type SortBy = 'name' | 'modified' | 'size';
+type SortDir = 'asc' | 'desc';
 
 interface FileManagerViewProps {
   accounts: CloudAccount[];
@@ -90,6 +93,8 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
   const [sharedDeleteFile, setSharedDeleteFile] = useState<CloudFile | null>(null);
   const [sharedDeleteLoading, setSharedDeleteLoading] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [sortBy, setSortBy] = useState<SortBy>('modified');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const menuRef = useRef<HTMLDivElement>(null);
 
   const MENU_WIDTH = 176;
@@ -257,7 +262,7 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
 
   useEffect(() => {
     fetchFiles(false);
-  }, [ownershipFilter, categoryFilter, navigatedFolderId, activeAccountId, debouncedSearch, refreshTick, showSharedFiles]);
+  }, [ownershipFilter, categoryFilter, navigatedFolderId, activeAccountId, debouncedSearch, refreshTick, showSharedFiles, sortBy, sortDir]);
 
   const getFilterParams = (): Record<string, string> => {
     switch (categoryFilter) {
@@ -293,16 +298,16 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
       if (navigatedFolderId) {
         params.set('folderId', navigatedFolderId);
       } else {
-        // API: folderId=root → parentFolderId IS NULL (Drive top-level only)
+        // API: folderId=root → top-level only (null parent or Drive My Drive root id)
         params.set('folderId', 'root');
       }
-    } else if (navigatedFolderId) {
-      // If user searched while inside a folder, keep search global but still allow account filter
-      // (no folderId — intentional)
     }
 
     if (activeAccountId) params.set('accountId', activeAccountId);
     if (debouncedSearch) params.set('query', debouncedSearch);
+    // Backend: sortBy name | size | (default modifiedAtProvider); sortDir asc | desc
+    params.set('sortBy', sortBy === 'modified' ? 'modified' : sortBy);
+    params.set('sortDir', sortDir);
     if (cursor) params.set('cursor', cursor);
 
     return params.toString();
@@ -480,8 +485,36 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
               </React.Fragment>
             ))}
           </nav>
-          <div className="flex items-center gap-2.5">
-            {/* List / Grid view toggle — File Manager only */}
+          <div className="flex items-center gap-2.5 flex-wrap justify-end">
+            {/* Sort: field + direction */}
+            <div className="flex h-9 border-2 border-black overflow-hidden shrink-0">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortBy)}
+                className="h-full px-2 text-[10px] font-semibold bg-white text-black border-0 border-r-2 border-black focus:outline-none cursor-pointer"
+                aria-label="Sort by"
+                title="Sort by"
+              >
+                <option value="name">Name (A–Z)</option>
+                <option value="modified">Date modified</option>
+                <option value="size">Storage size</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+                className="h-full px-2.5 flex items-center gap-1 bg-white text-black hover:bg-slate-50 text-[10px] font-semibold tracking-normal shrink-0"
+                title={sortDir === 'asc' ? 'Ascending — click for descending' : 'Descending — click for ascending'}
+                aria-label={sortDir === 'asc' ? 'Sort ascending' : 'Sort descending'}
+              >
+                {sortBy === 'name' ? (
+                  sortDir === 'asc' ? <ArrowUpAZ className="w-4 h-4" /> : <ArrowDownAZ className="w-4 h-4" />
+                ) : (
+                  sortDir === 'asc' ? <ArrowUpNarrowWide className="w-4 h-4" /> : <ArrowDownWideNarrow className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline">{sortDir === 'asc' ? 'Asc' : 'Desc'}</span>
+              </button>
+            </div>
+            {/* List / Grid view toggle */}
             <div
               className="flex h-9 border-2 border-black overflow-hidden shrink-0"
               role="group"

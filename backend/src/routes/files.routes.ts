@@ -273,10 +273,13 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       };
     }
 
-    const orderBy: Prisma.FileIndexOrderByWithRelationInput = {};
-    if (sortBy === 'name') orderBy.name = sortDir === 'asc' ? 'asc' : 'desc';
-    else if (sortBy === 'size') orderBy.size = sortDir === 'asc' ? 'asc' : 'desc';
-    else orderBy.modifiedAtProvider = sortDir === 'asc' ? 'asc' : 'desc';
+    const dir = sortDir === 'asc' ? 'asc' : 'desc';
+    const orderBy: Prisma.FileIndexOrderByWithRelationInput =
+      sortBy === 'name'
+        ? { name: dir }
+        : sortBy === 'size'
+          ? { size: dir }
+          : { modifiedAtProvider: dir }; // default + "modified"
 
     let total: number | null = null;
     if (!cursor) {
