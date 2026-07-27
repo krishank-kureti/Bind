@@ -4,6 +4,12 @@ import { logger } from '../utils/logger.js';
 
 const BATCH_SIZE = 25;
 
+function normalizeParentId(parents: string[] | undefined | null): string | null {
+  const parent = parents?.[0];
+  if (!parent || parent === 'root') return null;
+  return parent;
+}
+
 function buildUpsertPayload(file: any, accountId: string) {
   const base = {
     name: file.name ?? '',
@@ -11,7 +17,9 @@ function buildUpsertPayload(file: any, accountId: string) {
     size: file.size ? BigInt(file.size) : null,
     isFolder: file.mimeType === 'application/vnd.google-apps.folder',
     isTrashed: file.trashed ?? false,
-    parentFolderId: file.parents?.[0] ?? null,
+    // Drive may return parents: ['root'] or a My Drive root id (0A…); keep raw id for nesting.
+    // Listing treats "root" as parent null OR parent not in indexed folders.
+    parentFolderId: normalizeParentId(file.parents),
     createdAtProvider: file.createdTime ? new Date(file.createdTime) : null,
     modifiedAtProvider: file.modifiedTime ? new Date(file.modifiedTime) : null,
     webViewLink: file.webViewLink ?? null,

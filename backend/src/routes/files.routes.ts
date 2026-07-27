@@ -225,9 +225,31 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         where.mimeType = mimeType;
       }
     }
-    if (folderId === 'root') where.parentFolderId = null;
-    else if (folderId) {
-      const folder = await prisma.fileIndex.findUnique({ where: { id: folderId } });
+    if (folderId === 'root') {
+      // Drive "My Drive" root is usually a real folder id (e.g. 0A…), not null.
+      // Index stores parents[0] as-is, so true top-level items are those with:
+      //   parentFolderId IS NULL  OR  parent is not any indexed folder under these accounts.
+      const indexedFolders = await prisma.fileIndex.findMany({
+        where: { accountId: { in: accountIds }, isFolder: true },
+        select: { providerId: true },
+      });
+      const folderProviderIds = indexedFolders.map((f) => f.providerId);
+      if (folderProviderIds.length > 0) {
+        where.OR = [
+          { parentFolderId: null },
+          { parentFolderId: { notIn: folderProviderIds } },
+        ];
+      }
+      // If no folders are indexed, leave parent unconstrained (everything is top-level).
+    } else if (folderId) {
+      // Accept FileIndex cuid or Drive providerId (frontend navigates with providerId)
+      const folder = await prisma.fileIndex.findFirst({
+        where: {
+          accountId: { in: accountIds },
+          OR: [{ id: folderId }, { providerId: folderId }],
+        },
+        select: { providerId: true },
+      });
       where.parentFolderId = folder?.providerId ?? folderId;
     }
     if (starred === 'true') where.starred = true;
