@@ -374,7 +374,14 @@ export default function App() {
       case 'dashboard':
         return <DashboardView accounts={accounts} files={files} onOpenUploadModal={() => setIsUploadOpen(true)} isSyncing={isSyncing} onRefreshStorage={refreshStorageOnly} onNavigateIntelligence={() => setCurrentTab('intelligence')} onSyncAccounts={handleSyncAllAccounts} />;
       case 'files':
-        return <FileManagerView accounts={accounts} refreshTick={refreshTick} onOpenUploadModal={() => setIsUploadOpen(true)} />;
+        return (
+          <FileManagerView
+            accounts={accounts}
+            refreshTick={refreshTick}
+            onOpenUploadModal={() => setIsUploadOpen(true)}
+            showSharedFiles={userSettings.showSharedFiles}
+          />
+        );
       case 'intelligence':
         return <IntelligenceView accounts={accounts} files={files} onRefreshAllData={() => fetchAllData(true)} />;
       case 'accounts':

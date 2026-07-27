@@ -11,6 +11,9 @@ import {
   Sun,
   Moon,
   CheckCircle,
+  Share2,
+  AlertTriangle,
+  X,
 } from 'lucide-react';
 import {
   type UploadMode,
@@ -39,6 +42,7 @@ export default function SettingsView({
   const [dedupMode, setDedupModeState] = useState<'auto' | 'manual'>(() => getDedupMode());
   const [saving, setSaving] = useState(false);
   const [cacheMsg, setCacheMsg] = useState<string | null>(null);
+  const [sharedWarningOpen, setSharedWarningOpen] = useState(false);
 
   const handleDedup = (mode: 'auto' | 'manual') => {
     setDedupModeState(mode);
@@ -75,6 +79,34 @@ export default function SettingsView({
     } finally {
       setSaving(false);
     }
+  };
+
+  const persistShowShared = async (enabled: boolean) => {
+    const prev = settings;
+    onSettingsChange({ ...settings, showSharedFiles: enabled });
+    setSaving(true);
+    try {
+      const next = await patchSettings({ showSharedFiles: enabled });
+      onSettingsChange(next);
+    } catch {
+      onSettingsChange(prev);
+      alert('Failed to save shared files preference');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSharedFilesToggle = () => {
+    if (settings.showSharedFiles) {
+      void persistShowShared(false);
+      return;
+    }
+    setSharedWarningOpen(true);
+  };
+
+  const confirmEnableShared = async () => {
+    setSharedWarningOpen(false);
+    await persistShowShared(true);
   };
 
   const handleTheme = (next: ThemeMode) => {
@@ -161,6 +193,36 @@ export default function SettingsView({
         </div>
       </section>
 
+      {/* File Manager — shared files */}
+      <section className="bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] overflow-hidden settings-card">
+        <div className="bg-black text-white px-6 py-3 flex items-center gap-3">
+          <Share2 className="w-4 h-4 text-blue-400" />
+          <h3 className="font-semibold text-[11px] tracking-normal">File Manager</h3>
+        </div>
+        <div className="px-6 py-5 flex items-center justify-between gap-6">
+          <div className="min-w-0">
+            <h4 className="font-extrabold text-[13px] text-black settings-label">Shared Files</h4>
+            <p className="text-[10px] text-slate-500 font-bold mt-0.5 settings-desc">
+              Display shared files as well? Off by default — File Manager shows only files you own. Turn on to unlock All / Owned / Shared filters.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={settings.showSharedFiles}
+            onClick={handleSharedFilesToggle}
+            className="transition-colors shrink-0"
+            title={settings.showSharedFiles ? 'Shared files visible' : 'Owned files only'}
+          >
+            {settings.showSharedFiles ? (
+              <ToggleRight className="w-8 h-8 text-blue-600" />
+            ) : (
+              <ToggleLeft className="w-8 h-8 text-slate-400" />
+            )}
+          </button>
+        </div>
+      </section>
+
       {/* Notifications */}
       <section className="bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] overflow-hidden settings-card">
         <div className="bg-black text-white px-6 py-3 flex items-center gap-3">
@@ -239,6 +301,56 @@ export default function SettingsView({
           <RefreshCw className="w-3.5 h-3.5" /> Clear
         </button>
       </div>
+
+      {sharedWarningOpen && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40"
+          onClick={() => setSharedWarningOpen(false)}
+        >
+          <div
+            className="bg-white border-2 border-black shadow-[8px_8px_0px_rgba(0,0,0,1)] w-full max-w-md mx-4 relative modal-panel"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-black text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-400" />
+                <h2 className="font-extrabold text-[12px] tracking-normal">Enable Shared Files?</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSharedWarningOpen(false)}
+                className="text-white hover:text-slate-300 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-[12px] text-slate-700 font-medium leading-relaxed account-legend-label">
+                Operations on shared files are limited to <strong>your permissions</strong>. Actions like trash, rename, move, or copy may fail or behave differently than for files you own.
+              </p>
+              <p className="text-[11px] text-slate-500 font-bold">
+                After enabling, File Manager will show All Files / Owned / Shared filters so you can browse shared items.
+              </p>
+              <div className="flex justify-end gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setSharedWarningOpen(false)}
+                  className="px-4 py-2 border border-black bg-white text-slate-600 hover:bg-slate-50 text-[10px] font-semibold tracking-normal shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-0.5 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmEnableShared}
+                  className="geo-btn-primary text-[10px] flex items-center gap-1.5"
+                >
+                  <Share2 className="w-3.5 h-3.5" /> Enable shared files
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -6,11 +6,13 @@ export type ThemeMode = 'light' | 'dark';
 export interface UserSettings {
   uploadMode: UploadMode;
   notificationsEnabled: boolean;
+  showSharedFiles: boolean;
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
   uploadMode: 'auto',
   notificationsEnabled: true,
+  showSharedFiles: false,
 };
 
 const THEME_KEY = 'bind-theme';
@@ -67,7 +69,6 @@ export function clearLocalAppData(): void {
         keysToRemove.push(key);
       }
     }
-    // Always clear known keys even if empty scan
     keysToRemove.push(THEME_KEY, DEDUP_KEY);
     for (const key of new Set(keysToRemove)) {
       localStorage.removeItem(key);
@@ -78,16 +79,20 @@ export function clearLocalAppData(): void {
   setTheme('light');
 }
 
+function normalizeSettings(data: Record<string, unknown>): UserSettings {
+  return {
+    uploadMode: data.uploadMode === 'manual' ? 'manual' : 'auto',
+    notificationsEnabled: data.notificationsEnabled !== false,
+    showSharedFiles: data.showSharedFiles === true,
+  };
+}
+
 export async function fetchSettings(): Promise<UserSettings> {
   try {
     const res = await apiFetch('/api/settings');
     if (!res.ok) return { ...DEFAULT_SETTINGS };
     const body = await res.json();
-    const data = body.data ?? body;
-    return {
-      uploadMode: data.uploadMode === 'manual' ? 'manual' : 'auto',
-      notificationsEnabled: data.notificationsEnabled !== false,
-    };
+    return normalizeSettings(body.data ?? body);
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
@@ -106,9 +111,5 @@ export async function patchSettings(
     throw new Error(body.error?.message || 'Failed to save settings');
   }
   const body = await res.json();
-  const data = body.data ?? body;
-  return {
-    uploadMode: data.uploadMode === 'manual' ? 'manual' : 'auto',
-    notificationsEnabled: data.notificationsEnabled !== false,
-  };
+  return normalizeSettings(body.data ?? body);
 }

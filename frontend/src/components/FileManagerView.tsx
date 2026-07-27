@@ -7,6 +7,8 @@ interface FileManagerViewProps {
   accounts: CloudAccount[];
   refreshTick: number;
   onOpenUploadModal: () => void;
+  /** When false (default), only owned files are listed and ownership pills are hidden. */
+  showSharedFiles?: boolean;
 }
 
 function formatBytes(bytes: number, decimals = 1): string {
@@ -61,8 +63,8 @@ interface BreadcrumbItem {
 
 const BASE_LIMIT = 50;
 
-export default function FileManagerView({ accounts, refreshTick, onOpenUploadModal }: FileManagerViewProps) {
-  const [ownershipFilter, setOwnershipFilter] = useState('all');
+export default function FileManagerView({ accounts, refreshTick, onOpenUploadModal, showSharedFiles = false }: FileManagerViewProps) {
+  const [ownershipFilter, setOwnershipFilter] = useState(showSharedFiles ? 'all' : 'owned');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -99,16 +101,17 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
 
   const positionMenu = (rect: DOMRect) => {
     const pad = 8;
-    let left = rect.right - MENU_WIDTH;
+    // Prefer opening fully to the LEFT of the ⋯ button so the panel isn't clipped by the right edge
+    let left = rect.left - MENU_WIDTH - 4;
     let top = rect.bottom + 4;
 
-    if (left < pad) left = pad;
-    if (left + MENU_WIDTH > window.innerWidth - pad) {
-      left = Math.max(pad, window.innerWidth - MENU_WIDTH - pad);
+    // Fallback: if not enough room on the left, pin inside the viewport
+    if (left < pad) {
+      left = Math.min(rect.right + 4, window.innerWidth - MENU_WIDTH - pad);
+      left = Math.max(pad, left);
     }
 
     if (top + MENU_HEIGHT_EST > window.innerHeight - pad) {
-      // Open upward when near the bottom of the viewport
       top = Math.max(pad, rect.top - MENU_HEIGHT_EST - 4);
     }
     if (top + MENU_HEIGHT_EST > window.innerHeight - pad) {
@@ -229,6 +232,13 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
     setDebouncedSearch('');
   }, [ownershipFilter, categoryFilter]);
 
+  // When shared files are disabled, force owned-only view (and hide the filter pills in UI)
+  useEffect(() => {
+    if (!showSharedFiles) {
+      setOwnershipFilter('owned');
+    }
+  }, [showSharedFiles]);
+
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
     return () => clearTimeout(timer);
@@ -236,7 +246,7 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
 
   useEffect(() => {
     fetchFiles(false);
-  }, [ownershipFilter, categoryFilter, navigatedFolderId, activeAccountId, debouncedSearch, refreshTick]);
+  }, [ownershipFilter, categoryFilter, navigatedFolderId, activeAccountId, debouncedSearch, refreshTick, showSharedFiles]);
 
   const getFilterParams = (): Record<string, string> => {
     switch (categoryFilter) {
@@ -255,8 +265,16 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
     const filterParams = getFilterParams();
     for (const [k, v] of Object.entries(filterParams)) params.set(k, v);
     if (categoryFilter === 'starred') params.set('starred', 'true');
-    if (ownershipFilter === 'owned') params.set('owned', 'true');
-    if (ownershipFilter === 'shared') params.set('owned', 'false');
+
+    if (!showSharedFiles) {
+      params.set('owned', 'true');
+    } else if (ownershipFilter === 'owned') {
+      params.set('owned', 'true');
+    } else if (ownershipFilter === 'shared') {
+      params.set('owned', 'false');
+    }
+    // ownershipFilter === 'all' → no owned param
+
     if (navigatedFolderId) params.set('folderId', navigatedFolderId);
     if (activeAccountId) params.set('accountId', activeAccountId);
     if (debouncedSearch) params.set('query', debouncedSearch);
@@ -454,22 +472,24 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
         </div>
 
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            {ownershipFilters.map((tab) => {
-              const isActive = ownershipFilter === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setOwnershipFilter(tab.id)}
-                  className={`h-7 px-3 rounded-none text-[10px] font-semibold tracking-normal border cursor-pointer transition-all ${
+          {showSharedFiles && (
+            <div className="flex items-center gap-2">
+              {ownershipFilters.map((tab) => {
+                const isActive = ownershipFilter === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setOwnershipFilter(tab.id)}
+                    className={`h-7 px-3 rounded-none text-[10px] font-semibold tracking-normal border cursor-pointer transition-all ${
  isActive ? "bg-black text-white border-black shadow-[2px_2px_0px_0px_#3b82f6]" : "bg-white text-black border-black hover:bg-slate-50"
  }`}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div className="flex items-center gap-2 border-b-2 border-black pb-2">
             {categoryFilters.map((tab) => {
               const Icon = tab.icon;
