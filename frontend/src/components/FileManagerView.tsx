@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { CloudFile, CloudAccount } from "../types";
-import { Folder, FileText, Image, FileArchive, Star, Trash2, Upload, Shield, ChevronRight, File, Music, MoreHorizontal, Edit3, Copy, Move, X, Check, CreditCard, RotateCw, RefreshCw, ExternalLink } from "lucide-react";
+import { Folder, FileText, Image, FileArchive, Star, Trash2, Upload, Shield, ChevronRight, File, Music, MoreHorizontal, Edit3, Copy, Move, X, Check, CreditCard, RotateCw, RefreshCw, ExternalLink, List, LayoutGrid } from "lucide-react";
 import { apiFetch } from "../api";
 
 interface FileManagerViewProps {
@@ -89,6 +89,7 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
   const [syncNotification, setSyncNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [sharedDeleteFile, setSharedDeleteFile] = useState<CloudFile | null>(null);
   const [sharedDeleteLoading, setSharedDeleteLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const menuRef = useRef<HTMLDivElement>(null);
 
   const MENU_WIDTH = 176;
@@ -101,15 +102,14 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
 
   const positionMenu = (rect: DOMRect) => {
     const pad = 8;
-    // Prefer opening fully to the LEFT of the ⋯ button so the panel isn't clipped by the right edge
-    let left = rect.left - MENU_WIDTH - 4;
+    // Menu button is on the left of each row — prefer opening to the RIGHT of the button
+    let left = rect.right + 4;
     let top = rect.bottom + 4;
 
-    // Fallback: if not enough room on the left, pin inside the viewport
-    if (left < pad) {
-      left = Math.min(rect.right + 4, window.innerWidth - MENU_WIDTH - pad);
-      left = Math.max(pad, left);
+    if (left + MENU_WIDTH > window.innerWidth - pad) {
+      left = Math.max(pad, rect.left - MENU_WIDTH - 4);
     }
+    if (left < pad) left = pad;
 
     if (top + MENU_HEIGHT_EST > window.innerHeight - pad) {
       top = Math.max(pad, rect.top - MENU_HEIGHT_EST - 4);
@@ -119,6 +119,17 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
     }
 
     setMenuPosition({ top, left });
+  };
+
+  const openFileMenu = (e: React.MouseEvent<HTMLButtonElement>, fileId: string) => {
+    e.stopPropagation();
+    if (openMenuFileId === fileId) {
+      setOpenMenuFileId(null);
+      setMenuPosition(null);
+      return;
+    }
+    positionMenu(e.currentTarget.getBoundingClientRect());
+    setOpenMenuFileId(fileId);
   };
 
   const handleToggleStar = async (fileId: string) => {
@@ -456,6 +467,33 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
             ))}
           </nav>
           <div className="flex items-center gap-2.5">
+            {/* List / Grid view toggle — File Manager only */}
+            <div
+              className="flex h-9 border-2 border-black overflow-hidden shrink-0"
+              role="group"
+              aria-label="View mode"
+            >
+              <button
+                type="button"
+                title="List view"
+                onClick={() => setViewMode('list')}
+                className={`w-10 h-full flex items-center justify-center border-r-2 border-black transition-colors ${
+                  viewMode === 'list' ? 'bg-blue-100 text-black' : 'bg-white text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                <List className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                title="Grid view"
+                onClick={() => setViewMode('grid')}
+                className={`w-10 h-full flex items-center justify-center transition-colors ${
+                  viewMode === 'grid' ? 'bg-blue-100 text-black' : 'bg-white text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+            </div>
             <div className="flex items-center border-2 border-black h-9">
               <input
                 type="text"
@@ -530,91 +568,84 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
             </div>
           ))}
         </div>
-      ) : (
+      ) : loadingFiles && sortedFiles.length === 0 ? (
+        <div className="bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] p-12 text-center text-slate-400 text-xs font-bold flex items-center justify-center gap-2">
+          <RefreshCw className="w-4 h-4 animate-spin" /> Loading...
+        </div>
+      ) : sortedFiles.length === 0 ? (
+        <div className="bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] p-12 text-center text-slate-500 text-xs font-bold">
+          No files found.
+        </div>
+      ) : viewMode === 'list' ? (
         <div className="bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] overflow-hidden">
-          <div className="h-11 bg-slate-100 border-b-2 border-black flex items-center px-6 text-[10px] text-black font-semibold tracking-normal">
+          <div className="h-11 bg-slate-100 border-b-2 border-black flex items-center px-4 sm:px-6 text-[10px] text-black font-semibold tracking-normal">
+            <div className="w-10 shrink-0" />
             <div className="w-8 shrink-0" />
-            <div className="flex-1 min-w-[200px]">Name</div>
+            <div className="flex-1 min-w-[160px]">Name</div>
             <div className="w-44 hidden sm:block">Source</div>
             <div className="w-24 text-right">Size</div>
             <div className="w-20 text-right">Modified</div>
-            <div className="w-20" />
           </div>
 
-          {loadingFiles && sortedFiles.length === 0 ? (
-            <div className="p-12 text-center text-slate-400 text-xs font-bold flex items-center justify-center gap-2">
-              <RefreshCw className="w-4 h-4 animate-spin" /> Loading...
-            </div>
-          ) : sortedFiles.length === 0 ? (
-            <div className="p-12 text-center text-slate-500 text-xs font-bold">No files found.</div>
-          ) : (
-            <div className="divide-y divide-black relative">
-              {sortedFiles.map((file) => (
-                <div key={file.id} className="h-12 flex items-center px-6 text-xs hover:bg-slate-50 transition-colors group">
-                  <div className="w-8 shrink-0 flex items-center cursor-pointer" onClick={() => openFileInGoogle(file)}>
-                    {getFileIcon(file)}
-                  </div>
-                  <div className="flex-1 min-w-[200px] flex items-center gap-3 pr-4 truncate font-bold">
-                    {renameFileId === file.id ? (
-                      <div className="flex items-center gap-1.5 flex-1">
-                        <input
-                          value={renameValue}
-                          onChange={(e) => setRenameValue(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') setRenameFileId(null); }}
-                          className="flex-1 h-7 border-2 border-black px-2 text-[11px] font-bold focus:outline-none"
-                          autoFocus
-                        />
-                        <button onClick={submitRename} className="p-1 bg-black text-white border border-black"><Check className="w-3 h-3" /></button>
-                        <button onClick={() => setRenameFileId(null)} className="p-1 bg-white border border-black"><X className="w-3 h-3" /></button>
-                      </div>
-                    ) : (
-                      <>
-                        <span
-                          className="text-black truncate cursor-pointer hover:text-blue-600"
-                          title={file.isFolder ? 'Open folder' : 'Open in Google Drive'}
-                          onClick={() => openFileInGoogle(file)}
-                        >
-                          {file.name}
-                        </span>
-                        {file.starred && <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />}
-                        {!file.isFolder && <ExternalLink className="w-3 h-3 text-slate-400 shrink-0 opacity-0 group-hover:opacity-100" />}
-                      </>
-                    )}
-                  </div>
-                  <div className="w-44 hidden sm:flex items-center">
-                    <span
-                      className="px-2 py-1 text-[9.5px] font-semibold flex items-center gap-1.5 border border-black tracking-normal account-source-tag"
-                      style={{ backgroundColor: `${getAccountColor(file.accountEmail)}22` }}
-                    >
-                      <span className="w-2 h-2 border border-black shrink-0" style={{ backgroundColor: getAccountColor(file.accountEmail) }} />
-                      <span className="truncate max-w-[124px] account-legend-label">{file.accountEmail?.split('@')[0] || 'SYS'}</span>
-                    </span>
-                  </div>
-                  <div className="w-24 text-right font-semibold text-slate-800 text-[11px]">
-                    {file.isFolder ? '--' : formatBytes(file.sizeBytes)}
-                  </div>
-                  <div className="w-20 text-right font-bold text-slate-500 text-[10.5px]">{file.modified}</div>
-                  <div className="w-20 flex items-center justify-end">
-                    <button
-                      onClick={(e) => {
-                        if (openMenuFileId === file.id) {
-                          setOpenMenuFileId(null);
-                          setMenuPosition(null);
-                        } else {
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          positionMenu(rect);
-                          setOpenMenuFileId(file.id);
-                        }
-                      }}
-                      className="file-menu-btn p-1.5 border border-black bg-white text-slate-500 hover:bg-slate-100 transition-colors"
-                    >
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
-                  </div>
+          <div className="divide-y divide-black relative">
+            {sortedFiles.map((file) => (
+              <div key={file.id} className="h-12 flex items-center px-4 sm:px-6 text-xs hover:bg-slate-50 transition-colors group">
+                <div className="w-10 shrink-0 flex items-center">
+                  <button
+                    type="button"
+                    onClick={(e) => openFileMenu(e, file.id)}
+                    className="file-menu-btn p-1.5 border border-black bg-white text-slate-500 hover:bg-slate-100 transition-colors"
+                    title="Actions"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
                 </div>
-              ))}
-            </div>
-          )}
+                <div className="w-8 shrink-0 flex items-center cursor-pointer" onClick={() => openFileInGoogle(file)}>
+                  {getFileIcon(file)}
+                </div>
+                <div className="flex-1 min-w-[160px] flex items-center gap-3 pr-4 truncate font-bold">
+                  {renameFileId === file.id ? (
+                    <div className="flex items-center gap-1.5 flex-1">
+                      <input
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') setRenameFileId(null); }}
+                        className="flex-1 h-7 border-2 border-black px-2 text-[11px] font-bold focus:outline-none"
+                        autoFocus
+                      />
+                      <button onClick={submitRename} className="p-1 bg-black text-white border border-black"><Check className="w-3 h-3" /></button>
+                      <button onClick={() => setRenameFileId(null)} className="p-1 bg-white border border-black"><X className="w-3 h-3" /></button>
+                    </div>
+                  ) : (
+                    <>
+                      <span
+                        className="text-black truncate cursor-pointer hover:text-blue-600"
+                        title={file.isFolder ? 'Open folder' : 'Open in Google Drive'}
+                        onClick={() => openFileInGoogle(file)}
+                      >
+                        {file.name}
+                      </span>
+                      {file.starred && <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />}
+                      {!file.isFolder && <ExternalLink className="w-3 h-3 text-slate-400 shrink-0 opacity-0 group-hover:opacity-100" />}
+                    </>
+                  )}
+                </div>
+                <div className="w-44 hidden sm:flex items-center">
+                  <span
+                    className="px-2 py-1 text-[9.5px] font-semibold flex items-center gap-1.5 border border-black tracking-normal account-source-tag"
+                    style={{ backgroundColor: `${getAccountColor(file.accountEmail)}22` }}
+                  >
+                    <span className="w-2 h-2 border border-black shrink-0" style={{ backgroundColor: getAccountColor(file.accountEmail) }} />
+                    <span className="truncate max-w-[124px] account-legend-label">{file.accountEmail?.split('@')[0] || 'SYS'}</span>
+                  </span>
+                </div>
+                <div className="w-24 text-right font-semibold text-slate-800 text-[11px]">
+                  {file.isFolder ? '--' : formatBytes(file.sizeBytes)}
+                </div>
+                <div className="w-20 text-right font-bold text-slate-500 text-[10.5px]">{file.modified}</div>
+              </div>
+            ))}
+          </div>
 
           {hasMore && (
             <div className="border-t-2 border-black">
@@ -623,6 +654,71 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
                 Load More ({total - localFiles.length} remaining)
               </button>
             </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {sortedFiles.map((file) => (
+              <div
+                key={file.id}
+                className="bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] p-3 flex flex-col gap-2 hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_rgba(0,0,0,1)] transition-all group relative"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => openFileMenu(e, file.id)}
+                    className="file-menu-btn p-1 border border-black bg-white text-slate-500 hover:bg-slate-100 transition-colors shrink-0"
+                    title="Actions"
+                  >
+                    <MoreHorizontal className="w-3.5 h-3.5" />
+                  </button>
+                  {file.starred && <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openFileInGoogle(file)}
+                  className="flex flex-col items-center gap-2 py-3 cursor-pointer text-left w-full"
+                >
+                  <div className="scale-150">{getFileIcon(file)}</div>
+                  {renameFileId === file.id ? (
+                    <div className="flex items-center gap-1 w-full" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') setRenameFileId(null); }}
+                        className="flex-1 h-7 border-2 border-black px-1.5 text-[10px] font-bold focus:outline-none min-w-0"
+                        autoFocus
+                      />
+                      <button type="button" onClick={submitRename} className="p-1 bg-black text-white border border-black shrink-0"><Check className="w-3 h-3" /></button>
+                    </div>
+                  ) : (
+                    <span className="text-[11px] font-bold text-black text-center line-clamp-2 w-full break-words hover:text-blue-600">
+                      {file.name}
+                    </span>
+                  )}
+                </button>
+                <div className="mt-auto pt-2 border-t border-black space-y-1">
+                  <span
+                    className="inline-flex max-w-full px-1.5 py-0.5 text-[8px] font-semibold items-center gap-1 border border-black account-source-tag"
+                    style={{ backgroundColor: `${getAccountColor(file.accountEmail)}22` }}
+                  >
+                    <span className="w-1.5 h-1.5 border border-black shrink-0" style={{ backgroundColor: getAccountColor(file.accountEmail) }} />
+                    <span className="truncate account-legend-label">{file.accountEmail?.split('@')[0] || 'SYS'}</span>
+                  </span>
+                  <div className="flex justify-between text-[9px] font-bold text-slate-500">
+                    <span>{file.isFolder ? 'Folder' : formatBytes(file.sizeBytes)}</span>
+                    <span>{file.modified}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          {hasMore && (
+            <button onClick={() => fetchFiles(true)} disabled={loadingFiles} className="w-full h-12 flex items-center justify-center gap-2 bg-white border-2 border-black hover:bg-slate-50 text-[11px] font-semibold tracking-normal text-blue-600 transition-colors disabled:opacity-50 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+              {loadingFiles ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
+              Load More ({total - localFiles.length} remaining)
+            </button>
           )}
         </div>
       )}

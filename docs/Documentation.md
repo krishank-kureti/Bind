@@ -115,7 +115,6 @@ In development, Vite proxies `/api` → `http://localhost:3001`. The frontend ne
 ### Tooling / monorepo
 
 - Root `package.json` only pulls `ts-node` for ad-hoc tooling
-- Agent skills live under `.grok/skills/` (google-drive, bullmq-specialist, prisma, frontend-design, find-skills)
 - Engineering reference also exists in `AGENTS.md` and root `README.md` (prefer this doc + live source when they diverge)
 
 ---
@@ -170,7 +169,6 @@ BIND/
 ├── README.md                 # High-level product README
 ├── docs/
 │   └── Documentation.md      # This file
-├── .grok/skills/             # Agent skills
 ├── backend/
 │   ├── docker-compose.yml    # postgres:16-alpine + redis:7-alpine
 │   ├── package.json
