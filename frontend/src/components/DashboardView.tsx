@@ -106,8 +106,8 @@ export default function DashboardView({ accounts, files, onOpenUploadModal, isSy
         <div className="px-1">
           <span className="text-[10px] font-semibold text-slate-400 tracking-normal ">Connected Active Integration Nodes</span>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {accounts.slice(0, 3).map((a) => {
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {accounts.map((a) => {
             const pct = a.quotaTotal > 0 ? (a.quotaUsed / a.quotaTotal) * 100 : 0;
             return (
               <div key={a.id} className="bg-white border border-black p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_rgba(0,0,0,1)] transition-all">

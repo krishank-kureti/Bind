@@ -339,6 +339,10 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
       const params = new URLSearchParams();
       params.set('mimeType', 'application/vnd.google-apps.folder');
       params.set('limit', '500');
+      // Match File Manager: hide shared folders unless Shared Files is enabled
+      if (!showSharedFiles) {
+        params.set('owned', 'true');
+      }
       if (activeAccountId) params.set('accountId', activeAccountId);
       const res = await apiFetch(`/api/files?${params.toString()}`);
       if (res.ok) {
@@ -904,9 +908,23 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
                 <label className="block text-[10px] font-semibold text-black tracking-normal mb-1.5 ">Target Folder</label>
                 <select value={moveTargetFolderId || ''} onChange={(e) => setMoveTargetFolderId(e.target.value || null)} className="w-full h-10 border-2 border-black px-3 text-[11px] font-bold bg-white focus:outline-none">
                   <option value="">Root folder</option>
-                  {(moveMode === 'across' && moveTargetAccountId ? allFolders.filter((f) => f.accountId === moveTargetAccountId) : allFolders).map((f) => (
-                    <option key={f.id} value={f.providerId}>{f.name}</option>
-                  ))}
+                  {(() => {
+                    const moveFile = localFiles.find((f) => f.id === moveFileId);
+                    let folders = allFolders;
+                    if (moveMode === 'across' && moveTargetAccountId) {
+                      folders = allFolders.filter((f) => f.accountId === moveTargetAccountId);
+                    } else if (moveMode === 'same' && moveFile?.accountId) {
+                      // Same account: only folders under that account
+                      folders = allFolders.filter((f) => f.accountId === moveFile.accountId);
+                    }
+                    // Extra safety: never list shared folders when feature is off
+                    if (!showSharedFiles) {
+                      folders = folders.filter((f) => f.isOwned !== false);
+                    }
+                    return folders.map((f) => (
+                      <option key={f.id} value={f.providerId}>{f.name}</option>
+                    ));
+                  })()}
                 </select>
               </div>
 
