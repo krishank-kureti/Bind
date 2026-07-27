@@ -286,7 +286,21 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
     }
     // ownershipFilter === 'all' → no owned param
 
-    if (navigatedFolderId) params.set('folderId', navigatedFolderId);
+    // Scope to a single folder level so nested files don't appear next to their parent folder.
+    // Exception: free-text search and starred browse across the tree (not folder-scoped).
+    const flattenTree = Boolean(debouncedSearch) || categoryFilter === 'starred';
+    if (!flattenTree) {
+      if (navigatedFolderId) {
+        params.set('folderId', navigatedFolderId);
+      } else {
+        // API: folderId=root → parentFolderId IS NULL (Drive top-level only)
+        params.set('folderId', 'root');
+      }
+    } else if (navigatedFolderId) {
+      // If user searched while inside a folder, keep search global but still allow account filter
+      // (no folderId — intentional)
+    }
+
     if (activeAccountId) params.set('accountId', activeAccountId);
     if (debouncedSearch) params.set('query', debouncedSearch);
     if (cursor) params.set('cursor', cursor);
