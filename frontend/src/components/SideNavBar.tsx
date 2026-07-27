@@ -1,12 +1,10 @@
 import React from "react";
-import { LayoutDashboard, FolderOpen, Brain, CreditCard, Plus, Settings, HelpCircle, Cloud, LogOut } from "lucide-react";
+import { LayoutDashboard, FolderOpen, Brain, CreditCard, Settings, HelpCircle, Cloud, LogOut } from "lucide-react";
 import { CloudAccount } from "../types";
 
 interface SideNavBarProps {
   currentTab: string;
   setCurrentTab: (tab: string) => void;
-  onOpenConnectModal: () => void;
-  accountsCount: number;
   accounts: CloudAccount[];
   onLogout: () => void;
 }
@@ -31,7 +29,7 @@ const footerItems = [
   { id: "support", label: "Support", icon: HelpCircle },
 ];
 
-export default function SideNavBar({ currentTab, setCurrentTab, onOpenConnectModal, accountsCount, accounts, onLogout }: SideNavBarProps) {
+export default function SideNavBar({ currentTab, setCurrentTab, accounts, onLogout }: SideNavBarProps) {
   const totalUsed = (accounts || []).reduce((sum, a) => sum + (a.quotaUsed || 0), 0);
   const totalQuota = (accounts || []).reduce((sum, a) => sum + (a.quotaTotal || 0), 0);
   const usagePercent = totalQuota > 0 ? Math.min(100, Math.round((totalUsed / totalQuota) * 100)) : 0;
@@ -73,12 +71,6 @@ export default function SideNavBar({ currentTab, setCurrentTab, onOpenConnectMod
             </button>
           );
         })}
-
-        <div className="pt-4 px-1">
-          <button onClick={onOpenConnectModal} className="w-full text-center geo-btn-primary flex items-center justify-center gap-2">
-            <Plus className="w-4 h-4" /> Add Account
-          </button>
-        </div>
       </nav>
 
       <div className="p-4 border-t border-black bg-slate-50 sidebar-grid-storage">

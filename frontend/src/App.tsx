@@ -332,7 +332,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex app-shell">
-      <SideNavBar currentTab={currentTab} setCurrentTab={setCurrentTab} onOpenConnectModal={() => setIsConnectOpen(true)} accountsCount={accounts.length} accounts={accounts} onLogout={handleLogout} />
+      <SideNavBar currentTab={currentTab} setCurrentTab={setCurrentTab} accounts={accounts} onLogout={handleLogout} />
       <div className="flex-1 ml-64 flex flex-col min-h-screen relative font-sans app-main">
         <TopNavBar currentTab={currentTab} />
         <main className="flex-1 p-8 pt-24 overflow-y-auto app-content">
