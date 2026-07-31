@@ -1,5 +1,15 @@
 {
   "rewrites": [
     { "source": "/api/:match*", "destination": "https://bind-a3nr.onrender.com/api/:match*" }
+  ],
+  "headers": [
+    {
+      "source": "/privacy/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }]
+    },
+    {
+      "source": "/terms/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }]
+    }
   ]
 }
