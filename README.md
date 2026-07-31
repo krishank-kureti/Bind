@@ -335,8 +335,27 @@ Working prototype against real Google Drive accounts: multi-account OAuth, file 
 
 ---
 
+## ⏱️ Free-tier keep-alive (Render)
+
+Render’s **free** web service **spins down after ~15 minutes** with no traffic. This repo includes a GitHub Actions cron that hits `/api/health` every **10 minutes**:
+
+- Workflow: [`.github/workflows/keep-alive.yml`](.github/workflows/keep-alive.yml)
+- Default URL: `https://bind-a3nr.onrender.com/api/health` (override with repo variable `RENDER_HEALTH_URL`)
+- Health check also pings **Postgres** and **Redis** so Neon can be woken when the app is woken
+
+| Service | Needs keep-alive? | Free-tier notes |
+|---|---|---|
+| **Render (API)** | **Yes** | Hibernates when idle. Cron/uptime pings keep it warm. **Always-on free has monthly hour limits** — 24/7 pinging can burn free hours; upgrade if you outgrow it. |
+| **Neon (Postgres)** | **Usually no separate cron** | Compute **auto-suspends** when idle. Hitting `/api/health` (which runs `SELECT 1`) while the API is up warms Neon. First request after sleep is slower (cold start). |
+| **Upstash (Redis)** | **No** | Serverless Redis doesn’t “sleep” like Render free web services. Usage is request-based; no cron required for availability. |
+
+Enable **GitHub → Actions** on the repo after push so the schedule runs. You can also use a free external monitor (e.g. UptimeRobot every 5–10 min) against the same health URL.
+
+---
+
 <div align="center">
 
 **CloudVault / BIND** — *built deliberately.*
 
 </div>
+

@@ -1,0 +1,42 @@
+# Ping the Render free-tier backend so it does not sleep after idle.
+# Also warms Neon (via /api/health DB check) when the server is up.
+#
+# Setup:
+# 1. Push this workflow to GitHub (Actions must be enabled on the repo).
+# 2. Optional: set repo variable RENDER_HEALTH_URL if your URL differs.
+#    Settings → Secrets and variables → Actions → Variables
+#    RENDER_HEALTH_URL = https://your-service.onrender.com/api/health
+#
+# Default URL matches frontend/vercel.json production API host.
+
+name: Keep Render backend awake
+
+on:
+  schedule:
+    # Every 10 minutes (Render free sleeps ~15 min after idle)
+    - cron: "*/10 * * * *"
+  workflow_dispatch: # allow manual run from Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Health check
+        env:
+          HEALTH_URL: ${{ vars.RENDER_HEALTH_URL || 'https://bind-a3nr.onrender.com/api/health' }}
+        run: |
+          set -e
+          echo "Pinging $HEALTH_URL"
+          # Retry a few times — cold start on free Render can take 30–60s+
+          for i in 1 2 3 4 5; do
+            if curl -fsS --max-time 60 "$HEALTH_URL"; then
+              echo ""
+              echo "OK (attempt $i)"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 15s..."
+            sleep 15
+          done
+          echo "Health check failed after retries"
+          exit 1

@@ -91,9 +91,28 @@ app.use('/api/duplicates', duplicateRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/settings', settingsRoutes);
 
-// Health check
-app.get('/api/health', (_req, res) => {
-  res.json({ success: true, data: { status: 'ok', timestamp: new Date().toISOString() } });
+// Health check (+ optional DB/Redis pings so free-tier Neon can be woken with the app)
+app.get('/api/health', async (_req, res) => {
+  const checks: { db?: string; redis?: string } = {};
+  try {
+    const { prisma } = await import('./config/prisma.js');
+    await prisma.$queryRaw`SELECT 1`;
+    checks.db = 'ok';
+  } catch {
+    checks.db = 'error';
+  }
+  try {
+    const { redis } = await import('./config/redis.js');
+    const pong = await redis.ping();
+    checks.redis = pong === 'PONG' ? 'ok' : 'error';
+  } catch {
+    checks.redis = 'error';
+  }
+  const healthy = checks.db === 'ok' && checks.redis === 'ok';
+  res.status(healthy ? 200 : 503).json({
+    success: healthy,
+    data: { status: healthy ? 'ok' : 'degraded', timestamp: new Date().toISOString(), checks },
+  });
 });
 
 // --- Frontend Stub Endpoints ---
