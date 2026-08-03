@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BIND — Multi-account Google Drive command center</title>
+  <title>BIND – About</title>
   <meta
     name="description"
     content="BIND unifies multiple Google Drive accounts in one place: browse, search, upload, reclaim storage, and manage files without jumping between accounts."
@@ -312,32 +312,48 @@
     footer {
       border-top: 2px solid #000;
       background: var(--surface);
-      padding: 1.25rem;
+      padding: 1.5rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+    footer .footer-brand {
+      font-size: 1rem;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      color: var(--ink);
+    }
+    footer .footer-links {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.75rem 1.25rem;
-      justify-content: space-between;
+      gap: 0.5rem 1.15rem;
       align-items: center;
-    }
-    footer .copy {
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: var(--muted);
-      font-family: "JetBrains Mono", monospace;
-      font-style: normal;
-    }
-    footer nav {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
     }
     footer a {
       font-size: 0.8rem;
       font-weight: 800;
       text-decoration: none;
       border-bottom: 2px solid transparent;
+      color: var(--ink);
     }
     footer a:hover { border-bottom-color: #000; }
+    footer .footer-contact {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--muted);
+      font-family: "JetBrains Mono", monospace;
+      font-style: normal;
+    }
+    footer .footer-contact a {
+      font-size: inherit;
+      font-weight: 700;
+      color: var(--muted);
+      border-bottom-color: transparent;
+    }
+    footer .footer-contact a:hover {
+      color: var(--ink);
+      border-bottom-color: #000;
+    }
   </style>
 </head>
 <body>
@@ -371,7 +387,7 @@
           <span class="eyebrow mono">PUBLIC · ABOUT BIND</span>
           <h2 id="about-title">One pane of glass for every Google Drive you use.</h2>
           <p class="lead">
-            <strong>BIND</strong> is a unified cloud storage management platform for people who juggle multiple Google Drive accounts.
+            BIND is a web application that lets users connect multiple Google Drive accounts and manage, browse, search, upload, and organize files from a single dashboard.
           </p>
           <p class="body">
             Connect your Google accounts with secure OAuth, browse and search files across accounts in one File Manager,
@@ -434,14 +450,16 @@
     </main>
 
     <footer>
-      <div class="copy">© BIND · Unified cloud storage management</div>
-      <nav>
-        <a href="/about/">About</a>
+      <div class="footer-brand">BIND</div>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="/about/">Application Home Page</a>
         <a href="/privacy/">Privacy Policy</a>
         <a href="/terms/">Terms of Service</a>
-        <a href="/api/auth/google">Sign in with Google</a>
-        <a href="/">App</a>
       </nav>
+      <div class="footer-contact">
+        Contact:
+        <a href="mailto:kuretikrishank@gmail.com">kuretikrishank@gmail.com</a>
+      </div>
     </footer>
   </div>
 </body>
