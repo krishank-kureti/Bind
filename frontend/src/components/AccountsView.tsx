@@ -1,6 +1,6 @@
 import React from "react";
 import { CloudAccount } from "../types";
-import { CreditCard, Plus, Trash2, RefreshCw, ExternalLink, CheckCircle, XCircle, Clock, RotateCw } from "lucide-react";
+import { CreditCard, Plus, Trash2, RefreshCw, CheckCircle, XCircle, Clock, RotateCw, LogOut } from "lucide-react";
 
 interface AccountsViewProps {
   accounts: CloudAccount[];
@@ -8,6 +8,7 @@ interface AccountsViewProps {
   onRefreshAllData: () => void;
   onDisconnectAccount: (id: string) => void;
   onSyncAccount: (id: string) => Promise<string | void>;
+  onLogout: () => void;
 }
 
 function formatBytes(bytes: number, decimals = 1): string {
@@ -27,20 +28,28 @@ function statusBadge(status: string) {
   }
 }
 
-export default function AccountsView({ accounts, onOpenConnectModal, onRefreshAllData, onDisconnectAccount, onSyncAccount }: AccountsViewProps) {
+export default function AccountsView({ accounts, onOpenConnectModal, onRefreshAllData, onDisconnectAccount, onSyncAccount, onLogout }: AccountsViewProps) {
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-12">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center gap-4 flex-wrap">
         <div>
           <h2 className="font-black text-black text-lg tracking-normal">Connected Accounts</h2>
           <p className="text-[11px] text-slate-500 font-bold mt-1 ">{accounts.length} integration node{accounts.length !== 1 ? 's' : ''}</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <button onClick={async () => { for (const a of accounts) await onSyncAccount(a.id); onRefreshAllData(); }} className="geo-btn-secondary flex items-center gap-1.5">
             <RefreshCw className="w-4 h-4" /> Sync All
           </button>
           <button onClick={onOpenConnectModal} className="geo-btn-primary flex items-center gap-1.5">
             <Plus className="w-4 h-4" /> Add Account
+          </button>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="h-10 px-4 border-2 border-black bg-white text-red-600 hover:bg-red-50 text-[12px] font-bold tracking-normal shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 transition-all flex items-center gap-1.5"
+            title="End your BIND session and return to the login screen"
+          >
+            <LogOut className="w-4 h-4" /> Log out of all accounts
           </button>
         </div>
       </div>

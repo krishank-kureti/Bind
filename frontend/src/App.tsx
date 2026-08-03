@@ -385,7 +385,16 @@ export default function App() {
       case 'intelligence':
         return <IntelligenceView accounts={accounts} files={files} onRefreshAllData={() => fetchAllData(true)} />;
       case 'accounts':
-        return <AccountsView accounts={accounts} onOpenConnectModal={() => setIsConnectOpen(true)} onRefreshAllData={() => fetchAllData(true)} onDisconnectAccount={handleDisconnectAccount} onSyncAccount={handleSyncAccount} />;
+        return (
+          <AccountsView
+            accounts={accounts}
+            onOpenConnectModal={() => setIsConnectOpen(true)}
+            onRefreshAllData={() => fetchAllData(true)}
+            onDisconnectAccount={handleDisconnectAccount}
+            onSyncAccount={handleSyncAccount}
+            onLogout={handleLogout}
+          />
+        );
       case 'settings':
         return (
           <SettingsView
