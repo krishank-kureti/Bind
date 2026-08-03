@@ -44,7 +44,7 @@ export default function SideNavBar({ currentTab, setCurrentTab, accounts, onLogo
         </div>
         <div>
           <h1 className="font-black text-2xl text-black tracking-normal leading-none ">BIND</h1>
-          <p className="text-[9px] text-slate-500 font-bold tracking-normal mt-1">Unified CloudVault</p>
+          <p className="text-[9px] text-slate-500 font-bold tracking-normal mt-1">Drive command center</p>
         </div>
       </div>
 

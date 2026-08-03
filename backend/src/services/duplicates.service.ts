@@ -36,7 +36,8 @@ export async function scanDuplicates(userId: string): Promise<{ groupsCreated: n
   });
 
   const hashGroups = new Map<string, { fileIds: string[]; accountIds: string[]; sizes: bigint[] }>();
-  const nameGroups = new Map<string, { fileIds: string[]; accountIds: string[]; sizes: bigint[]; names: string[] }>();
+  // Fallback when MD5 is missing (e.g. Google Docs): same normalized name AND same size only
+  const nameSizeGroups = new Map<string, { fileIds: string[]; accountIds: string[]; sizes: bigint[] }>();
 
   for (const f of allFiles) {
     if (f.md5Checksum) {
@@ -53,20 +54,21 @@ export async function scanDuplicates(userId: string): Promise<{ groupsCreated: n
         });
       }
     } else {
-      const key = normalizeName(f.name);
-      if (!key) continue;
-      const existing = nameGroups.get(key);
+      const normalized = normalizeName(f.name);
+      if (!normalized) continue;
+      // Include size in the key so "Untitled document" of different sizes never collapse
+      const sizeKey = f.size == null ? 'null' : f.size.toString();
+      const key = `${normalized}|${sizeKey}`;
+      const existing = nameSizeGroups.get(key);
       if (existing) {
         existing.fileIds.push(f.id);
         existing.accountIds.push(f.accountId);
         existing.sizes.push(f.size ?? 0n);
-        existing.names.push(f.name);
       } else {
-        nameGroups.set(key, {
+        nameSizeGroups.set(key, {
           fileIds: [f.id],
           accountIds: [f.accountId],
           sizes: [f.size ?? 0n],
-          names: [f.name],
         });
       }
     }
@@ -142,9 +144,10 @@ export async function scanDuplicates(userId: string): Promise<{ groupsCreated: n
     await processGroup(checksum, data.fileIds, data.accountIds, data.sizes);
   }
 
-  for (const [key, data] of nameGroups.entries()) {
-    if (data.fileIds.length >= 2) activeChecksums.add(`name:${key}`);
-    await processGroup(`name:${key}`, data.fileIds, data.accountIds, data.sizes);
+  for (const [key, data] of nameSizeGroups.entries()) {
+    const groupKey = `name:${key}`;
+    if (data.fileIds.length >= 2) activeChecksums.add(groupKey);
+    await processGroup(groupKey, data.fileIds, data.accountIds, data.sizes);
   }
 
   const stale = await prisma.duplicateGroup.findMany({

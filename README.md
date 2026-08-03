@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🗄️ CLOUDVAULT
+# 🗄️ BIND
 
 ### *A unified cloud storage command center for multi-account Google Drive management*
 
@@ -11,7 +11,9 @@
 ---
 
 > **One pane of glass for every Google Drive account you own.**
-> Connect multiple accounts via OAuth, browse & search files across all of them at once, move bytes between accounts, surface duplicates, and reclaim wasted storage — all from a single striking dashboard.
+> **BIND** connects multiple accounts via OAuth, lets you browse & search files across all of them at once, move bytes between accounts, surface duplicates, and reclaim wasted storage — all from a single striking dashboard.
+
+Public product page (Google OAuth application home page): **https://bind-one-zeta.vercel.app/about/**
 
 ---
 
@@ -355,7 +357,7 @@ Enable **GitHub → Actions** on the repo after push so the schedule runs. You c
 
 <div align="center">
 
-**CloudVault / BIND** — *built deliberately.*
+**BIND** — *built deliberately.*
 
 </div>
 

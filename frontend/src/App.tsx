@@ -284,7 +284,7 @@ export default function App() {
                 <Cloud className="w-10 h-10" />
               </div>
               <h1 className="font-black text-7xl text-black tracking-tight mb-4">BIND</h1>
-              <p className="text-sm text-slate-400 font-bold tracking-normal ">Unified CloudVault Storage Router</p>
+              <p className="text-sm text-slate-400 font-bold tracking-normal ">Multi-account Google Drive command center</p>
             </div>
             <div className="w-full">
               <div className="h-3 w-full bg-slate-100 border-2 border-black overflow-hidden">
@@ -304,6 +304,7 @@ export default function App() {
             <Cloud className="w-8 h-8" />
           </div>
           <h1 className="font-black text-5xl text-black tracking-normal ">BIND</h1>
+          <p className="text-[11px] text-slate-500 font-bold -mt-4">Multi-account Google Drive command center</p>
           <div className="bg-white border-2 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-8 space-y-5">
             <p className="text-xs text-slate-600 font-bold leading-relaxed tracking-normal">
               Consolidate all your Google Drive accounts into a single unified interface.
@@ -320,7 +321,13 @@ export default function App() {
               </button>
             </div>
           </div>
-          <p className="text-[9px] text-slate-400 tracking-normal">Powered by Google OAuth 2.0</p>
+          <p className="text-[9px] text-slate-400 tracking-normal">
+            <a href="/about/" className="underline font-bold text-slate-500 hover:text-black">About BIND</a>
+            {' · '}
+            <a href="/privacy/" className="underline font-bold text-slate-500 hover:text-black">Privacy</a>
+            {' · '}
+            <a href="/terms/" className="underline font-bold text-slate-500 hover:text-black">Terms</a>
+          </p>
         </div>
       </div>
     );
