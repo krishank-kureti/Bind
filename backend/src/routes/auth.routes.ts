@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import passport from 'passport';
 import { getUserWithAccounts } from '../services/auth.service.js';
+import { touchLastSeen } from '../services/activity.service.js';
 import { env } from '../config/env.js';
 
 const router = Router();
@@ -53,6 +54,9 @@ router.get('/me', noCache, async (req, res, next) => {
   }
 
   try {
+    // Stamp activity (throttled) so periodic sync only re-indexes active users.
+    void touchLastSeen(req.user.id);
+
     const userData = await getUserWithAccounts(req.user.id);
     if (!userData) {
       res.status(200).json({

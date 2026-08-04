@@ -4,6 +4,7 @@ import { prisma } from './prisma.js';
 import { env } from './env.js';
 import { encrypt } from '../utils/encryption.js';
 import { indexAccount } from '../services/index.service.js';
+import { touchLastSeen } from '../services/activity.service.js';
 import { logger } from '../utils/logger.js';
 
 passport.serializeUser((user: Express.User, done) => {
@@ -88,6 +89,7 @@ passport.use(new GoogleStrategy({
         indexAccount(newAccount.id).catch((err) => logger.error({ accountId: newAccount.id, err }, 'Index failed for new account'));
       }
 
+      await touchLastSeen(req.user.id, { force: true });
       done(null, req.user);
       return;
     }
@@ -108,6 +110,7 @@ passport.use(new GoogleStrategy({
       });
       logger.info({ accountId: existingAccount.id }, 'Indexing existing account after re-auth');
       indexAccount(existingAccount.id).catch((err) => logger.error({ accountId: existingAccount.id, err }, 'Index failed for existing account'));
+      await touchLastSeen(existingAccount.user.id, { force: true });
       done(null, existingAccount.user);
       return;
     }
@@ -117,6 +120,7 @@ passport.use(new GoogleStrategy({
         email,
         displayName,
         avatarUrl,
+        lastSeenAt: new Date(),
       },
       select: { id: true, email: true, displayName: true, avatarUrl: true },
     });

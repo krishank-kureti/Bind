@@ -2,8 +2,12 @@ import { prisma } from '../config/prisma.js';
 import { indexAccount } from './index.service.js';
 import { logger } from '../utils/logger.js';
 
+/** How often we look for accounts that need a full re-index. */
+const CHECK_INTERVAL_MS = 15 * 60 * 1000;
+/** Account is eligible only if last successful sync is older than this (or never). */
 const SYNC_STALE_MS = 30 * 60 * 1000;
-const CHECK_INTERVAL_MS = 5 * 60 * 1000;
+/** Only re-index Drive accounts for users who opened BIND in this window. */
+const ACTIVE_USER_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_CONCURRENT = 1;
 
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
@@ -40,14 +44,20 @@ export async function runPeriodicSyncCheck(): Promise<void> {
 
   try {
     const staleBefore = new Date(Date.now() - SYNC_STALE_MS);
+    const activeSince = new Date(Date.now() - ACTIVE_USER_MS);
+
     const accounts = await prisma.connectedAccount.findMany({
       where: {
         isActive: true,
-        syncStatus: { not: 'SYNCING' },
+        // Skip broken tokens until the user reconnects / manual sync succeeds
+        syncStatus: { notIn: ['SYNCING', 'ERROR'] },
         OR: [
           { lastSyncedAt: null },
           { lastSyncedAt: { lt: staleBefore } },
         ],
+        user: {
+          lastSeenAt: { gte: activeSince },
+        },
       },
       select: { id: true, email: true, lastSyncedAt: true },
       orderBy: { lastSyncedAt: 'asc' },
@@ -73,7 +83,11 @@ export function startPeriodicSync(): void {
   if (intervalHandle) return;
 
   logger.info(
-    { checkIntervalMin: CHECK_INTERVAL_MS / 60000, staleMin: SYNC_STALE_MS / 60000 },
+    {
+      checkIntervalMin: CHECK_INTERVAL_MS / 60000,
+      staleMin: SYNC_STALE_MS / 60000,
+      activeUserDays: ACTIVE_USER_MS / (24 * 60 * 60 * 1000),
+    },
     'Periodic account sync scheduler started',
   );
 
