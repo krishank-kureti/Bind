@@ -28,7 +28,7 @@ Public product page (Google OAuth application home page): **https://bind-one-zet
 | 📤 | **Smart upload routing** | Auto-route to the account with the most free space, or **Manual** mode (pick account in the upload modal). Setting persists per user. |
 | ♻️ | **Duplicate intelligence** | MD5 grouping with normalized-name fallback for Google Docs/Sheets. **Owned files only** (shared excluded so resolve can delete). One-click Resolve & Reclaim. |
 | 📊 | **Live storage analytics** | Per-account and aggregate quota visualization, file-type distribution. |
-| 🔄 | **Sync** | Manual Sync Live + **periodic full re-index** for accounts stale &gt; 30 minutes. Uploads and file mutations update the index (and invalidate list cache) immediately. |
+| 🔄 | **Sync** | Manual Sync Live + **periodic full re-index** (checks every **15 min**) for accounts of **active users** (opened BIND in last **30 days**), stale &gt; **30 min**, and not in `ERROR`. Uploads and mutations update the index immediately. |
 | ⚙️ | **User settings** | Upload mode, sync-alert toasts, show shared files, light/dark theme (theme is browser-local). |
 | 🎨 | **Neo-Brutalist design** | Zero border-radius, heavy borders, flat offset shadows, Tiempos + JetBrains Mono, light/dark via `data-theme`. |
 
@@ -67,7 +67,7 @@ Fonts        Tiempos Text / Tiempos Headline (local) + JetBrains Mono (webfont)
 - Node.js **20 LTS+**
 - A PostgreSQL instance (local Docker, Neon, Supabase…)
 - A Redis instance (local Docker, Upstash, Redis Cloud…)
-- A Google Cloud project with **OAuth 2.0 credentials** and the **Drive** scope
+- A Google Cloud project with **OAuth 2.0 credentials**, **Google Drive API** enabled, and scopes: `openid` + `email`/`profile` + `https://www.googleapis.com/auth/drive`
 
 ### 1 · Configure environment
 ```bash
@@ -170,7 +170,7 @@ PATCH  /api/settings                      { uploadMode, notificationsEnabled, sh
 
 ```
 User  ─┬─ ConnectedAccount ─┬─ FileIndex  (cache of Drive items, rebuildable)
-       │                    ├─ StorageQuota
+       │  (lastSeenAt)      ├─ StorageQuota
        │                    └─ DuplicateFile
        ├─ Session
        ├─ UserSettings      (uploadMode · notifications · showSharedFiles)
@@ -180,16 +180,25 @@ UploadJob
 
 **Enums:** `SyncStatus` (PENDING · SYNCING · SYNCED · ERROR), `UploadStatus` (PENDING · UPLOADING · COMPLETE · FAILED).
 
+`User.lastSeenAt` gates background re-index to users who opened BIND in the last 30 days.
+
 `FileIndex` is a **cache**, always rebuildable via `indexAccount()`. `isOwned` is set from Drive `owners[].me` during indexing. The `owned` query param filters on it without a hardcoded default in the API (the **frontend** defaults to owned-only unless `showSharedFiles` is on).
 
 ---
 
 ## 🏛️ Architecture Notes
 
-- **Mostly synchronous long ops.** Indexing (manual + periodic), uploads, and duplicate scans run **inline in the HTTP request** (or on a server interval for periodic sync). There is **no BullMQ worker stack** in current source.
-- **Periodic sync.** On boot, a scheduler checks active accounts whose `lastSyncedAt` is null or older than **30 minutes** and re-indexes them (concurrency capped).
+- **Mostly synchronous long ops.** Indexing (manual + periodic), uploads, and duplicate scans run **inline in the HTTP request** (or on a server interval for periodic sync). There is **no BullMQ worker stack** in current source (`backend/src/workers/` is empty).
+- **Periodic sync** (`periodicSync.service.ts`, started on boot):
+  - **Check interval:** every **15 minutes**
+  - **Full re-index eligibility:** `lastSyncedAt` null or older than **30 minutes**
+  - **Active users only:** parent `User.lastSeenAt` within the last **30 days** (stamped on login + throttled on `GET /api/auth/me`)
+  - **Skip** accounts with `syncStatus` `ERROR` or `SYNCING` (broken tokens stop hammering Google until reconnect / manual sync)
+  - **Concurrency:** 1 account per tick
+  - What it does: full Drive `files.list` metadata re-index into `FileIndex` — **not** duplicate detection
+- **Activity tracking.** `User.lastSeenAt` + `activity.service.ts`. Migration backfills existing users once; ongoing activity keeps them in the window.
 - **Real-time index on mutations.** Upload completion upserts `FileIndex`; trash/rename/move/etc. update the DB and **invalidate** Redis file-list cache keys for that user.
-- **Token encryption.** Access + refresh tokens AES-256-GCM in `ConnectedAccount`; refresh with a 5-min buffer before expiry.
+- **Token encryption.** Access + refresh tokens AES-256-GCM in `ConnectedAccount`; refresh with a 5-min buffer before expiry. `invalid_grant` means the refresh token is dead — user must reconnect that Google account (logout alone does not fix other linked accounts).
 - **First-page file listing cache.** 15s in Redis: `files:${userId}:${sha256(query).slice(0,32)}`. Cursor pages not cached; COUNT only on first page.
 - **Storage quota cache.** 15-min TTL via `StorageQuota.refreshedAt`.
 - **Cross-account move.** Stream source → upload destination → delete source → index rows updated in-request.
@@ -230,7 +239,7 @@ BIND/
 │   │   ├── routes/           auth, accounts, files, folders, search,
 │   │   │                     storage, upload, duplicates, analytics, settings
 │   │   ├── services/         drive · index · token · storage · upload ·
-│   │   │                     duplicates · auth · periodicSync
+│   │   │                     duplicates · auth · periodicSync · activity
 │   │   ├── middleware/       auth · error · validate
 │   │   ├── utils/            encryption · logger · pagination · cache
 │   │   └── types/            express.d.ts · google.types.ts
@@ -239,6 +248,9 @@ BIND/
 │   └── .env.example
 ├── frontend/
 │   ├── public/
+│   │   ├── about/            Static OAuth / product home page
+│   │   ├── privacy/          Privacy Policy
+│   │   ├── terms/            Terms of Service
 │   │   ├── fonts/tiempos/    Local Tiempos OTFs
 │   │   └── images/favicon.png
 │   ├── src/
@@ -301,6 +313,32 @@ docker compose -p bind down -v          # teardown including data volumes
 
 ---
 
+## 🌐 Public static pages (OAuth / legal)
+
+Served from `frontend/public/` on Vercel (not the React shell):
+
+| URL | Purpose |
+|---|---|
+| `/about/` | Product / **Google OAuth application home page** |
+| `/privacy/` | Privacy Policy |
+| `/terms/` | Terms of Service |
+| `/` | React app (auth gate, dashboard) |
+
+Browser titles for public + app shell use product name **BIND**. Consent screen App name should match.
+
+### Google Cloud OAuth Data access (required)
+
+```
+openid
+https://www.googleapis.com/auth/userinfo.email
+https://www.googleapis.com/auth/userinfo.profile
+https://www.googleapis.com/auth/drive
+```
+
+Do **not** use `cloud-platform` (GCP, not Drive). Enable **Google Drive API**. Feature type for full Drive: **Drive productivity**.
+
+---
+
 ## ⚠️ Known Constraints & Gotchas
 
 1. **Synchronous long ops.** Large Drive indexes, uploads, and duplicate scans block the request (or a single periodic-sync slot).
@@ -309,9 +347,12 @@ docker compose -p bind down -v          # teardown including data volumes
 4. **No `folderId=root` default.** Unscoped listing can span nesting levels — drill into folders for scoped views.
 5. **Google Docs/Sheets** often have `null` `md5Checksum` → name-based duplicate matching.
 6. **`supportsAllDrives: true`** is used on permanent delete; broader Shared Drive support may need more API flags.
-7. **`invalid_grant`.** Refresh can fail after revoke/expiry — user must re-auth via OAuth.
-8. **`/api/auth/me` returns 200** with `{ user: null, accounts: [] }` when logged out (frontend auth gate).
-9. **Re-deploy logouts.** Sessions live in Redis; changing `SESSION_SECRET` or wiping Redis logs everyone out. Frontend-only deploys do not.
+7. **`invalid_grant`.** Refresh token dead (revoke, Testing 7-day expiry, client/secret change, encryption key change). Reconnect **that** Drive account; logout does not refresh other linked accounts. Accounts in `ERROR` are skipped by periodic sync.
+8. **`ACCESS_TOKEN_SCOPE_INSUFFICIENT`.** Token lacks Drive scope — fix Console Data access + re-consent.
+9. **`/api/auth/me` returns 200** with `{ user: null, accounts: [] }` when logged out (frontend auth gate). Stamps `lastSeenAt` when authenticated (throttled).
+10. **Logout** ends the BIND **session** only (not disconnect all Drive accounts). Splash after logout is ~3s by design.
+11. **Re-deploy logouts.** Sessions live in Redis; changing `SESSION_SECRET` or wiping Redis logs everyone out. Frontend-only deploys do not.
+12. **OAuth Testing mode.** Refresh tokens for test users expire ~**7 days** — re-consent required.
 
 ---
 

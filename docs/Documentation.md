@@ -1,8 +1,11 @@
-# CloudVault (BIND) — Complete Project Documentation
+# BIND — Complete Project Documentation
 
-**Product name:** BIND / CloudVault  
+**Product name:** BIND  
 **Tagline:** Unified cloud storage command center for multi-account Google Drive management  
-**Repository layout:** Monorepo with Express.js API (`backend/`) and React SPA (`frontend/`)
+**Repository layout:** Monorepo with Express.js API (`backend/`) and React SPA (`frontend/`)  
+**Last reviewed against source:** 2026-08-05  
+
+Public product / OAuth home page: `https://bind-one-zeta.vercel.app/about/`
 
 ---
 
@@ -34,14 +37,16 @@
 
 ## 1. Overview
 
-**CloudVault (branded in the UI as BIND)** is a unified multi-account Google Drive management platform. Users authenticate with Google OAuth, connect one or more Drive accounts, and operate on a single indexed view of their files across accounts.
+**BIND** is a unified multi-account Google Drive management platform. Users authenticate with Google OAuth, connect one or more Drive accounts, and operate on a single indexed view of their files across accounts.
 
 The system:
 
 - Indexes Drive metadata into PostgreSQL (file index is a **rebuildable cache**, not source of truth)
 - Encrypts OAuth tokens at rest (AES-256-GCM)
 - Stores sessions in Redis
+- Runs **periodic full re-index** for active users only (see [Periodic sync](#periodic-sync))
 - Surfaces storage quotas, full-text search, duplicate detection, smart upload routing, and cross-account file moves
+- Serves static **About / Privacy / Terms** pages for OAuth and legal
 - Presents a distinctive Neo-Brutalist / Swiss Modernist frontend (zero radius, heavy borders, offset shadows)
 
 ### Ports
@@ -61,8 +66,8 @@ In development, Vite proxies `/api` → `http://localhost:3001`. The frontend ne
 
 | Area | Capability |
 |---|---|
-| **Auth** | Google OAuth 2.0 (Passport), session cookies, multi-account linking while signed in |
-| **Accounts** | List, sync (re-index), status, disconnect (cascade) |
+| **Auth** | Google OAuth 2.0 (Passport), session cookies, multi-account linking while signed in; `lastSeenAt` activity |
+| **Accounts** | List, sync (re-index), status, disconnect (cascade); logout ends session only |
 | **Files** | Unified listing with filters, cursor pagination, rename/move/star/trash/restore/delete/copy |
 | **Cross-account move** | Stream download → upload to target → delete source → update index |
 | **Folders** | Top-level folders, folder contents, create folder |
@@ -176,35 +181,41 @@ BIND/
 │   ├── tsconfig.json
 │   ├── .env / .env.example
 │   ├── prisma/
-│   │   ├── schema.prisma     # 8 models, 2 enums
+│   │   ├── schema.prisma     # models + enums (User.lastSeenAt, settings, …)
 │   │   └── migrations/       # SQL migration history
 │   ├── public/               # Legacy test.html / test.js
 │   ├── uploads/              # Multer temp files
 │   └── src/
 │       ├── app.ts            # Express app, middleware, routes, stubs
-│       ├── server.ts         # Listen, Prisma/Redis connect, shutdown
+│       ├── server.ts         # Listen, Prisma/Redis, startPeriodicSync, shutdown
 │       ├── config/
 │       │   ├── env.ts        # Zod-validated env
 │       │   ├── passport.ts   # Google OAuth strategy + user linking
 │       │   ├── prisma.ts     # PrismaClient + pg adapter pool
 │       │   └── redis.ts      # ioredis client
-│       ├── routes/           # 9 routers
-│       ├── services/         # Business logic (Drive, index, etc.)
+│       ├── routes/           # auth, accounts, files, folders, search, storage, upload, duplicates, analytics, settings
+│       ├── services/         # drive, index, token, storage, upload, duplicates, auth, periodicSync, activity
 │       ├── middleware/       # auth, error, validate
-│       ├── utils/            # encryption, logger, pagination
+│       ├── utils/            # encryption, logger, pagination, cache
 │       ├── types/            # express.d.ts, google.types.ts
 │       ├── generated/prisma/ # Prisma client output
-│       └── workers/          # Empty (future background jobs)
+│       └── workers/          # Empty (no BullMQ in current source)
 └── frontend/
     ├── package.json
     ├── vite.config.ts        # Port 3000, /api → :3001
     ├── vercel.json           # Production API rewrite
     ├── index.html
-    ├── public/fonts/tiempos/ # Local OTF font files
+    ├── public/
+    │   ├── about/            # OAuth / product home page
+    │   ├── privacy/          # Privacy Policy
+    │   ├── terms/            # Terms of Service
+    │   ├── fonts/tiempos/    # Local OTF font files
+    │   └── images/favicon.png
     └── src/
         ├── main.tsx
         ├── App.tsx           # Auth, splash, tabs, data orchestration
         ├── api.ts            # credentials: include fetch
+        ├── settings.ts       # UserSettings API + local theme helpers
         ├── types.ts          # Domain TS interfaces
         ├── index.css         # Tailwind + geo-* design tokens + fonts
         └── components/
@@ -294,8 +305,39 @@ Open **http://localhost:3000** → splash → **Sign in with Google**.
 ### Google OAuth setup notes
 
 - Authorized redirect URI must match `GOOGLE_CALLBACK_URL` (default `http://localhost:3001/api/auth/google/callback`)
-- Scope used: `openid`, `email`, `profile`, `https://www.googleapis.com/auth/drive`
+- **Enable Google Drive API** in the same Cloud project as the OAuth client
+- **App name:** BIND (must match branding)
+- **Application home page:** prefer `https://…/about/` (static product page)
+- **Privacy / Terms:** `/privacy/`, `/terms/`
+- **Data access scopes (Console + code):**
+
+```
+openid
+https://www.googleapis.com/auth/userinfo.email
+https://www.googleapis.com/auth/userinfo.profile
+https://www.googleapis.com/auth/drive
+```
+
+- Do **not** add `cloud-platform` (GCP, not Drive)
+- Code: Passport + `/api/auth/google` request `openid`, `email`, `profile`, `https://www.googleapis.com/auth/drive`
 - Strategy uses `accessType: 'offline'` and `prompt: 'select_account consent'` so refresh tokens are obtained
+- Feature justification type: **Drive productivity**
+- Testing mode: refresh tokens for test users expire ~**7 days**
+
+### Periodic sync
+
+Defined in `backend/src/services/periodicSync.service.ts`, started from `server.ts`:
+
+| Parameter | Value |
+|---|---|
+| Check interval | **15 minutes** |
+| Full re-index when | `lastSyncedAt` null or older than **30 minutes** |
+| User must be active | `User.lastSeenAt` within last **30 days** |
+| Skip | `syncStatus` ∈ `SYNCING`, `ERROR` |
+| Concurrency | 1 account per tick |
+| Operation | Full metadata re-index (`indexAccount`) — **not** duplicates |
+
+Activity stamping: `activity.service.ts` — force on OAuth login; throttled (~1/hour) on `GET /api/auth/me`.
 
 ---
 
@@ -372,7 +414,10 @@ UploadJob  (standalone by userId / targetAccountId — no FK relations in schema
 | email | String | unique |
 | displayName | String? | |
 | avatarUrl | String? | |
+| lastSeenAt | DateTime? | Last authenticated open of BIND; gates periodic sync (30-day window). Indexed. |
 | createdAt / updatedAt | DateTime | |
+
+Migration `20260804010000_add_user_last_seen_at` backfills existing users to `now()` once.
 
 #### `ConnectedAccount` → `connected_accounts`
 
@@ -1037,20 +1082,24 @@ Pagination:
 
 ## 18. Known Constraints & Gotchas
 
-1. **Synchronous heavy work** — Indexing large Drives, uploads, and duplicate scans block HTTP requests.
+1. **Synchronous heavy work** — Indexing large Drives, uploads, and duplicate scans block HTTP requests (or one periodic-sync slot).
 2. **Upload 30s timeout** — Large files may fail even within multer’s 10 GB limit if Drive transfer exceeds 30s.
-3. **Workers not wired** — `src/workers` empty; no BullMQ/lazySync in current source (despite older docs).
-4. **No default `folderId=root`** — Unfiltered listing returns files across nesting levels; drill folders for scoped views.
-5. **Google Docs/Sheets** — `md5Checksum` null → name-based duplicate grouping.
-6. **`supportsAllDrives: true`** only on permanent delete today.
-7. **Shared delete** removes from user’s view, not global ownership.
-8. **`invalid_grant`** — Refresh can fail after revoke/restart; user must re-auth.
-9. **Settings toggles** and Support ticket are **UI-only** (no persistence / no ticket backend).
-10. **Gemini endpoint** is heuristic mock, not Google Gemini API.
-11. **Support diagnostics** mostly stubbed except `/api/auth/me`.
-12. **Dashboard waste banner** uses client-side name+size heuristic on first page of files — not the same as server duplicate groups.
-13. **Express 5** `req.params` typing requires casts to `string`.
-14. **Docker compose corruption** — use `-p bind` project name.
+3. **No BullMQ / lazySync** — `src/workers` empty; older notes that mention queues are obsolete.
+4. **Periodic sync gates** — Only active users (30d `lastSeenAt`); skip `ERROR` accounts; check every 15m; re-index if stale 30m.
+5. **Logout ≠ disconnect** — Session only; linked Drive accounts and tokens remain until trash disconnect.
+6. **`invalid_grant`** — Dead refresh token; reconnect **that** Google account. Logout/login does not fix other linked accounts.
+7. **`ACCESS_TOKEN_SCOPE_INSUFFICIENT`** — Console missing Drive scope or old token without Drive; re-consent after fixing Data access.
+8. **No default `folderId=root`** — Unfiltered listing returns files across nesting levels; drill folders for scoped views.
+9. **Google Docs/Sheets** — `md5Checksum` null → name-based duplicate grouping.
+10. **`supportsAllDrives: true`** only on permanent delete today.
+11. **Shared delete** removes from user’s view, not global ownership.
+12. **UserSettings** are persisted in Postgres; **theme** is browser-local (`bind-theme`). Support ticket form is client-only.
+13. **Gemini endpoint** (if present) is heuristic mock, not Google Gemini API.
+14. **Support diagnostics** mostly stubbed except `/api/auth/me`.
+15. **Dashboard waste banner** may use client-side heuristics — Intelligence uses server duplicate groups.
+16. **Express 5** `req.params` typing requires casts to `string`.
+17. **Docker compose corruption** — use `-p bind` project name.
+18. **OAuth Testing mode** — ~7-day refresh token lifetime for test users.
 
 ---
 
@@ -1118,17 +1167,19 @@ Working prototype against real Google Drive accounts:
 - Multi-account OAuth and encrypted tokens
 - Full file listing, filters, CRUD-like ops, cross-account move
 - Search, storage, uploads, duplicate scan/resolve
-- Neo-Brutalist multi-tab UI
+- Periodic sync (15m check, 30m stale, active users 30d, skip ERROR)
+- Activity tracking (`lastSeenAt`)
+- Public about / privacy / terms pages
+- Neo-Brutalist multi-tab UI + light/dark theme
 
 ### Likely next milestones
 
-1. Background jobs (BullMQ) for index / upload / duplicates / periodic sync  
-2. Lazy / debounced re-index after mutations  
-3. Persist Settings; real diagnostics and support tickets  
-4. Real AI storage audit (or remove mock Gemini UI)  
-5. Shared drive / `supportsAllDrives` consistency  
-6. Raise or remove upload 30s timeout; progress streaming  
-7. Stronger tests (currently no automated test suite in package scripts)
+1. Optional background jobs for large index / upload / duplicates  
+2. UI “Reconnect account” on `invalid_grant` / ERROR  
+3. Real support tickets / stronger diagnostics  
+4. Shared drive / `supportsAllDrives` consistency  
+5. Raise or remove upload 30s timeout; progress streaming  
+6. Automated tests (currently no suite in package scripts)
 
 ---
 
@@ -1212,4 +1263,4 @@ Frontend File Manager categories are slightly different (`images`, `docs`, `arch
 
 ---
 
-*Document generated from the BIND / CloudVault repository source as of the documentation date. When in doubt, treat live code under `backend/src` and `frontend/src` as authoritative over historical agent notes.*
+*Documentation last aligned with repository source on **2026-08-05**. When in doubt, treat live code under `backend/src` and `frontend/src` as authoritative.*
