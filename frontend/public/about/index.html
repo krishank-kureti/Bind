@@ -138,13 +138,14 @@
     .brand-mark svg { width: 18px; height: 18px; }
     .brand-text h1 {
       margin: 0;
-      font-size: 1.35rem;
+      font-size: 1.85rem;
       font-weight: 900;
-      letter-spacing: 0.02em;
+      letter-spacing: 0.06em;
       line-height: 1;
+      text-transform: uppercase;
     }
     .brand-text p {
-      margin: 0.2rem 0 0;
+      margin: 0.25rem 0 0;
       font-size: 0.65rem;
       font-weight: 700;
       color: var(--muted);
@@ -210,6 +211,14 @@
       font-weight: 900;
       letter-spacing: -0.02em;
       line-height: 1.1;
+    }
+    .wordmark {
+      margin: 0 0 0.75rem;
+      font-size: clamp(3.25rem, 9vw, 5rem);
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      line-height: 0.95;
+      text-transform: uppercase;
     }
     .panel .lead {
       margin: 0 0 1.25rem;
@@ -385,6 +394,7 @@
       <div class="hero-grid">
         <section class="panel" aria-labelledby="about-title">
           <span class="eyebrow mono">PUBLIC · ABOUT BIND</span>
+          <p class="wordmark" aria-hidden="true">BIND</p>
           <h2 id="about-title">One pane of glass for every Google Drive you use.</h2>
           <p class="lead">
             BIND is a web application that lets users connect multiple Google Drive accounts and manage, browse, search, upload, and organize files from a single dashboard.
