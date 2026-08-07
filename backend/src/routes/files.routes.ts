@@ -158,7 +158,42 @@ router.post('/batch/move', async (req: Request, res: Response, next: NextFunctio
         const owned = await verifyOwnership(userId, id);
         if (!owned) { results.push({ id, success: false, error: 'Not found' }); continue; }
         await driveMove(owned.account.id, owned.file.providerId, folderId, owned.file.parentFolderId);
-        await prisma.fileIndex.update({ where: { id }, data: { parentFolderId: folderId } });
+        await prisma.fileIndex.update({
+          where: { id },
+          data: { parentFolderId: folderId === 'root' ? null : folderId },
+        });
+        results.push({ id, success: true });
+      } catch (err) {
+        results.push({ id, success: false, error: err instanceof Error ? err.message : 'Unknown error' });
+      }
+    }
+
+    await invalidateFileListCache(userId);
+    res.json({ success: true, data: results });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/batch/star', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req.user as Express.User).id;
+    const { fileIds, starred } = req.body as { fileIds?: string[]; starred?: boolean };
+    if (!fileIds || fileIds.length === 0 || typeof starred !== 'boolean') {
+      res.status(400).json({
+        success: false,
+        error: { code: 'MISSING_PARAMS', message: 'fileIds and starred (boolean) are required' },
+      });
+      return;
+    }
+
+    const results: Array<{ id: string; success: boolean; error?: string }> = [];
+    for (const id of fileIds) {
+      try {
+        const owned = await verifyOwnership(userId, id);
+        if (!owned) { results.push({ id, success: false, error: 'Not found' }); continue; }
+        await toggleStarFile(owned.account.id, owned.file.providerId, starred);
+        await prisma.fileIndex.update({ where: { id }, data: { starred } });
         results.push({ id, success: true });
       } catch (err) {
         results.push({ id, success: false, error: err instanceof Error ? err.message : 'Unknown error' });

@@ -8,6 +8,8 @@ interface AccountsViewProps {
   onRefreshAllData: () => void;
   onDisconnectAccount: (id: string) => void;
   onSyncAccount: (id: string) => Promise<string | void>;
+  onSyncAll?: () => void | Promise<void>;
+  isSyncing?: boolean;
   onLogout: () => void;
 }
 
@@ -28,7 +30,7 @@ function statusBadge(status: string) {
   }
 }
 
-export default function AccountsView({ accounts, onOpenConnectModal, onRefreshAllData, onDisconnectAccount, onSyncAccount, onLogout }: AccountsViewProps) {
+export default function AccountsView({ accounts, onOpenConnectModal, onRefreshAllData, onDisconnectAccount, onSyncAccount, onSyncAll, isSyncing, onLogout }: AccountsViewProps) {
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-12">
       <div className="flex justify-between items-center gap-4 flex-wrap">
@@ -37,8 +39,16 @@ export default function AccountsView({ accounts, onOpenConnectModal, onRefreshAl
           <p className="text-[11px] text-slate-500 font-bold mt-1 ">{accounts.length} integration node{accounts.length !== 1 ? 's' : ''}</p>
         </div>
         <div className="flex gap-3 flex-wrap">
-          <button onClick={async () => { for (const a of accounts) await onSyncAccount(a.id); onRefreshAllData(); }} className="geo-btn-secondary flex items-center gap-1.5">
-            <RefreshCw className="w-4 h-4" /> Sync All
+          <button
+            type="button"
+            disabled={isSyncing || accounts.length === 0}
+            onClick={() => {
+              if (onSyncAll) void onSyncAll();
+              else void (async () => { for (const a of accounts) await onSyncAccount(a.id); onRefreshAllData(); })();
+            }}
+            className="geo-btn-secondary flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} /> Sync All
           </button>
           <button onClick={onOpenConnectModal} className="geo-btn-primary flex items-center gap-1.5">
             <Plus className="w-4 h-4" /> Add Account
@@ -86,8 +96,14 @@ export default function AccountsView({ accounts, onOpenConnectModal, onRefreshAl
                     <span className={`text-[9px] font-semibold tracking-normal px-2.5 py-1 border flex items-center gap-1.5 ${badge.cls}`}>
                       <Icon className={`w-3 h-3 ${a.syncStatus === 'SYNCING' ? 'animate-spin' : ''}`} /> {badge.label}
                     </span>
-                    <button onClick={() => onSyncAccount(a.id)} className="p-2 border border-black bg-white text-blue-600 hover:bg-blue-50 transition-colors" title="Sync">
-                      <RotateCw className="w-4 h-4" />
+                    <button
+                      type="button"
+                      disabled={isSyncing}
+                      onClick={() => void onSyncAccount(a.id)}
+                      className="p-2 border border-black bg-white text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-50"
+                      title="Sync"
+                    >
+                      <RotateCw className={`w-4 h-4 ${a.syncStatus === 'SYNCING' ? 'animate-spin' : ''}`} />
                     </button>
                     <button onClick={() => onDisconnectAccount(a.id)} className="p-2 border border-black bg-white text-red-500 hover:bg-red-50 transition-colors" title="Disconnect">
                       <Trash2 className="w-4 h-4" />

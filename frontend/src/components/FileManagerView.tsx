@@ -84,7 +84,8 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
   const [renameFileId, setRenameFileId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
-  const [moveFileId, setMoveFileId] = useState<string | null>(null);
+  /** One or more file index ids to move (single-menu or multi-select). */
+  const [moveFileIds, setMoveFileIds] = useState<string[]>([]);
   const [moveMode, setMoveMode] = useState<'same' | 'across'>('same');
   const [moveTargetAccountId, setMoveTargetAccountId] = useState<string | null>(null);
   const [moveTargetFolderId, setMoveTargetFolderId] = useState<string | null>(null);
@@ -95,6 +96,9 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [sortBy, setSortBy] = useState<SortBy>('modified');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  /** Multi-select for bulk star / move / trash (not rename). */
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const MENU_WIDTH = 176;
@@ -213,18 +217,133 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
     }
   };
 
-  const handleMoveFile = async (fileId: string, folderId: string) => {
+  const handleMoveFile = async (fileId: string, folderId: string): Promise<boolean> => {
     const prev = localFiles;
     setLocalFiles((p) => p.filter((f) => f.id !== fileId));
     const res = await apiFetch(`/api/files/${fileId}/move`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folderId }) });
-    if (!res.ok) { setLocalFiles(prev); showToast('Failed to move file', 'error'); }
+    if (!res.ok) {
+      setLocalFiles(prev);
+      showToast('Failed to move file', 'error');
+      return false;
+    }
+    showToast('File moved', 'success');
+    return true;
   };
 
-  const handleMoveAcrossAccounts = async (fileId: string, targetAccountId: string, targetFolderId?: string) => {
+  const handleMoveAcrossAccounts = async (fileId: string, targetAccountId: string, targetFolderId?: string): Promise<boolean> => {
     const prev = localFiles;
     setLocalFiles((p) => p.filter((f) => f.id !== fileId));
     const res = await apiFetch(`/api/files/${fileId}/move-across`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetAccountId, targetFolderId }) });
-    if (!res.ok) { setLocalFiles(prev); showToast('Failed to move file', 'error'); }
+    if (!res.ok) {
+      setLocalFiles(prev);
+      showToast('Failed to move file', 'error');
+      return false;
+    }
+    showToast('File moved', 'success');
+    return true;
+  };
+
+  type BatchResult = { id: string; success: boolean; error?: string };
+
+  const parseBatchResults = async (res: Response): Promise<BatchResult[]> => {
+    if (!res.ok) return [];
+    const body = await res.json().catch(() => ({}));
+    return Array.isArray(body.data) ? body.data : [];
+  };
+
+  const summarizeBatch = (results: BatchResult[], actionLabel: string) => {
+    const ok = results.filter((r) => r.success).length;
+    const fail = results.filter((r) => !r.success).length;
+    if (fail === 0) {
+      showToast(`${actionLabel} ${ok} item${ok !== 1 ? 's' : ''}`, 'success');
+    } else if (ok === 0) {
+      showToast(`Failed to ${actionLabel.toLowerCase()} selected items`, 'error');
+    } else {
+      showToast(`${actionLabel} ${ok}, ${fail} failed`, 'error');
+    }
+    return { ok, fail, failedIds: new Set(results.filter((r) => !r.success).map((r) => r.id)) };
+  };
+
+  const toggleSelect = (fileId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(fileId)) next.delete(fileId);
+      else next.add(fileId);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const selectAllVisible = (ids: string[]) => {
+    setSelectedIds(new Set(ids));
+  };
+
+  const handleBulkStar = async (starred: boolean) => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0 || bulkBusy) return;
+    const prev = localFiles;
+    setBulkBusy(true);
+    setLocalFiles((p) => p.map((f) => (ids.includes(f.id) ? { ...f, starred } : f)));
+    try {
+      const res = await apiFetch('/api/files/batch/star', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileIds: ids, starred }),
+      });
+      const results = await parseBatchResults(res);
+      if (!res.ok || results.length === 0) {
+        setLocalFiles(prev);
+        showToast('Failed to update star', 'error');
+        return;
+      }
+      const { failedIds } = summarizeBatch(results, starred ? 'Starred' : 'Unstarred');
+      if (failedIds.size > 0) {
+        setLocalFiles((p) =>
+          p.map((f) => (failedIds.has(f.id) ? { ...f, starred: !starred } : f)),
+        );
+      }
+    } catch {
+      setLocalFiles(prev);
+      showToast('Failed to update star', 'error');
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const handleBulkTrash = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0 || bulkBusy) return;
+    const prev = localFiles;
+    setBulkBusy(true);
+    setLocalFiles((p) => p.filter((f) => !ids.includes(f.id)));
+    try {
+      const res = await apiFetch('/api/files/batch/trash', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileIds: ids }),
+      });
+      const results = await parseBatchResults(res);
+      if (!res.ok || results.length === 0) {
+        setLocalFiles(prev);
+        showToast('Failed to trash selected items', 'error');
+        return;
+      }
+      const { failedIds } = summarizeBatch(results, 'Trashed');
+      if (failedIds.size > 0) {
+        const restore = prev.filter((f) => failedIds.has(f.id));
+        setLocalFiles((p) => {
+          const have = new Set(p.map((f) => f.id));
+          return [...restore.filter((f) => !have.has(f.id)), ...p];
+        });
+      }
+      clearSelection();
+    } catch {
+      setLocalFiles(prev);
+      showToast('Failed to trash selected items', 'error');
+    } finally {
+      setBulkBusy(false);
+    }
   };
 
   useEffect(() => {
@@ -241,11 +360,20 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
   }, []);
 
   useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') clearSelection();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
+  useEffect(() => {
     setNavigatedFolderId(null);
     setFolderBreadcrumb([]);
     setActiveAccountId(null);
     setSearchQuery('');
     setDebouncedSearch('');
+    clearSelection();
   }, [ownershipFilter, categoryFilter]);
 
   // When shared files are disabled, force owned-only view (and hide the filter pills in UI)
@@ -261,6 +389,7 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
   }, [searchQuery]);
 
   useEffect(() => {
+    clearSelection();
     fetchFiles(false);
   }, [ownershipFilter, categoryFilter, navigatedFolderId, activeAccountId, debouncedSearch, refreshTick, showSharedFiles, sortBy, sortDir]);
 
@@ -445,26 +574,116 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
     setRenameValue('');
   };
 
-  const openMoveDialog = (fileId: string) => {
-    setMoveFileId(fileId);
+  const openMoveDialog = (fileIds: string | string[]) => {
+    const ids = Array.isArray(fileIds) ? fileIds : [fileIds];
+    if (ids.length === 0) return;
+    const files = localFiles.filter((f) => ids.includes(f.id));
+    const accountIds = new Set(files.map((f) => f.accountId));
+    setMoveFileIds(ids);
     setMoveTargetAccountId(null);
     setMoveTargetFolderId(null);
-    setMoveMode('same');
+    // Same-account move only when every selected file shares one Drive account
+    setMoveMode(accountIds.size <= 1 ? 'same' : 'across');
     setMoveDialogOpen(true);
     setOpenMenuFileId(null);
+    setMenuPosition(null);
     fetchFolders();
   };
 
-  const submitMove = () => {
-    if (!moveFileId) return;
-    if (moveMode === 'same') {
-      handleMoveFile(moveFileId, moveTargetFolderId || 'root');
-    } else if (moveTargetAccountId) {
-      handleMoveAcrossAccounts(moveFileId, moveTargetAccountId, moveTargetFolderId || undefined);
-    }
+  const submitMove = async () => {
+    const ids = moveFileIds;
+    if (ids.length === 0 || bulkBusy) return;
+    const folderId = moveTargetFolderId || 'root';
+    const prev = localFiles;
+    setBulkBusy(true);
     setMoveDialogOpen(false);
-    setMoveFileId(null);
+
+    try {
+      if (moveMode === 'same') {
+        // Optimistic remove from current folder view
+        setLocalFiles((p) => p.filter((f) => !ids.includes(f.id)));
+        if (ids.length === 1) {
+          await handleMoveFile(ids[0], folderId);
+          // handleMoveFile already reverts/toasts on failure; ensure list if it reverted alone
+        } else {
+          const res = await apiFetch('/api/files/batch/move', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileIds: ids, folderId }),
+          });
+          const results = await parseBatchResults(res);
+          if (!res.ok || results.length === 0) {
+            setLocalFiles(prev);
+            showToast('Failed to move selected items', 'error');
+          } else {
+            const { failedIds } = summarizeBatch(results, 'Moved');
+            if (failedIds.size > 0) {
+              const restore = prev.filter((f) => failedIds.has(f.id));
+              setLocalFiles((p) => {
+                const have = new Set(p.map((f) => f.id));
+                return [...restore.filter((f) => !have.has(f.id)), ...p];
+              });
+            }
+          }
+        }
+      } else if (moveTargetAccountId) {
+        setLocalFiles((p) => p.filter((f) => !ids.includes(f.id)));
+        let ok = 0;
+        let fail = 0;
+        const failed: CloudFile[] = [];
+        for (const id of ids) {
+          const res = await apiFetch(`/api/files/${id}/move-across`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              targetAccountId: moveTargetAccountId,
+              targetFolderId: moveTargetFolderId || undefined,
+            }),
+          });
+          if (res.ok) ok += 1;
+          else {
+            fail += 1;
+            const file = prev.find((f) => f.id === id);
+            if (file) failed.push(file);
+          }
+        }
+        if (failed.length > 0) {
+          setLocalFiles((p) => {
+            const have = new Set(p.map((f) => f.id));
+            return [...failed.filter((f) => !have.has(f.id)), ...p];
+          });
+        }
+        if (fail === 0) showToast(`Moved ${ok} item${ok !== 1 ? 's' : ''}`, 'success');
+        else if (ok === 0) showToast('Failed to move selected items', 'error');
+        else showToast(`Moved ${ok}, ${fail} failed`, 'error');
+      }
+      clearSelection();
+    } catch {
+      setLocalFiles(prev);
+      showToast('Failed to move selected items', 'error');
+    } finally {
+      setMoveFileIds([]);
+      setBulkBusy(false);
+    }
   };
+
+  const selectedCount = selectedIds.size;
+  const selectedFiles = localFiles.filter((f) => selectedIds.has(f.id));
+  const allVisibleSelected =
+    sortedFiles.length > 0 && sortedFiles.every((f) => selectedIds.has(f.id));
+  const someVisibleSelected = sortedFiles.some((f) => selectedIds.has(f.id));
+  const allSelectedStarred =
+    selectedFiles.length > 0 && selectedFiles.every((f) => f.starred);
+  const moveSourceAccountId =
+    moveFileIds.length > 0
+      ? localFiles.find((f) => f.id === moveFileIds[0])?.accountId
+      : undefined;
+  const moveIsMulti = moveFileIds.length > 1;
+  const moveAccountsUniform =
+    moveFileIds.length > 0 &&
+    new Set(
+      localFiles.filter((f) => moveFileIds.includes(f.id)).map((f) => f.accountId),
+    ).size <= 1;
 
   const totalSize = sortedFiles.reduce((s, f) => s + f.sizeBytes, 0);
 
@@ -599,6 +818,48 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
         </div>
       </div>
 
+      {selectedCount > 0 && !isInAccountsMode && (
+        <div className="sticky top-0 z-20 bg-black text-white border-2 border-black shadow-[4px_4px_0px_rgba(59,130,246,1)] px-4 py-2.5 flex flex-wrap items-center gap-2 sm:gap-3">
+          <span className="text-[11px] font-extrabold tracking-normal mr-1">
+            {selectedCount} selected
+          </span>
+          <button
+            type="button"
+            disabled={bulkBusy}
+            onClick={() => handleBulkStar(!allSelectedStarred)}
+            className="h-8 px-3 border border-white/40 bg-white text-black text-[10px] font-semibold tracking-normal flex items-center gap-1.5 hover:bg-amber-50 disabled:opacity-50"
+            title={allSelectedStarred ? 'Unstar selected' : 'Star selected'}
+          >
+            <Star className={`w-3.5 h-3.5 ${allSelectedStarred ? 'text-amber-500 fill-amber-500' : ''}`} />
+            {allSelectedStarred ? 'Unstar' : 'Star'}
+          </button>
+          <button
+            type="button"
+            disabled={bulkBusy}
+            onClick={() => openMoveDialog(Array.from(selectedIds))}
+            className="h-8 px-3 border border-white/40 bg-white text-black text-[10px] font-semibold tracking-normal flex items-center gap-1.5 hover:bg-blue-50 disabled:opacity-50"
+          >
+            <Move className="w-3.5 h-3.5" /> Move
+          </button>
+          <button
+            type="button"
+            disabled={bulkBusy}
+            onClick={() => void handleBulkTrash()}
+            className="h-8 px-3 border border-red-400 bg-red-600 text-white text-[10px] font-semibold tracking-normal flex items-center gap-1.5 hover:bg-red-500 disabled:opacity-50"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> Trash
+          </button>
+          <button
+            type="button"
+            disabled={bulkBusy}
+            onClick={clearSelection}
+            className="h-8 px-3 border border-white/30 text-white text-[10px] font-semibold tracking-normal flex items-center gap-1.5 hover:bg-white/10 ml-auto disabled:opacity-50"
+          >
+            <X className="w-3.5 h-3.5" /> Clear
+          </button>
+        </div>
+      )}
+
       {isInAccountsMode && activeAccountId === null ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {accounts.map((a) => (
@@ -630,6 +891,19 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
       ) : viewMode === 'list' ? (
         <div className="bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] overflow-hidden">
           <div className="h-11 bg-slate-100 border-b-2 border-black flex items-center px-4 sm:px-6 text-[10px] text-black font-semibold tracking-normal">
+            <div className="w-9 shrink-0 flex items-center">
+              <input
+                type="checkbox"
+                checked={allVisibleSelected}
+                ref={(el) => {
+                  if (el) el.indeterminate = someVisibleSelected && !allVisibleSelected;
+                }}
+                onChange={() => (allVisibleSelected ? clearSelection() : selectAllVisible(sortedFiles.map((f) => f.id)))}
+                className="w-3.5 h-3.5 accent-black cursor-pointer border border-black"
+                title={allVisibleSelected ? 'Deselect all' : 'Select all visible'}
+                aria-label={allVisibleSelected ? 'Deselect all' : 'Select all visible'}
+              />
+            </div>
             <div className="w-10 shrink-0" />
             <div className="w-8 shrink-0" />
             <div className="flex-1 min-w-[160px]">Name</div>
@@ -640,7 +914,21 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
 
           <div className="divide-y divide-black relative">
             {sortedFiles.map((file) => (
-              <div key={file.id} className="h-12 flex items-center px-4 sm:px-6 text-xs hover:bg-slate-50 transition-colors group">
+              <div
+                key={file.id}
+                className={`h-12 flex items-center px-4 sm:px-6 text-xs transition-colors group ${
+                  selectedIds.has(file.id) ? 'bg-blue-50 hover:bg-blue-50' : 'hover:bg-slate-50'
+                }`}
+              >
+                <div className="w-9 shrink-0 flex items-center" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(file.id)}
+                    onChange={() => toggleSelect(file.id)}
+                    className="w-3.5 h-3.5 accent-black cursor-pointer"
+                    aria-label={`Select ${file.name}`}
+                  />
+                </div>
                 <div className="w-10 shrink-0 flex items-center">
                   <button
                     type="button"
@@ -713,17 +1001,29 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
             {sortedFiles.map((file) => (
               <div
                 key={file.id}
-                className="bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] p-3 flex flex-col gap-2 hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_rgba(0,0,0,1)] transition-all group relative"
+                className={`bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] p-3 flex flex-col gap-2 hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_rgba(0,0,0,1)] transition-all group relative ${
+                  selectedIds.has(file.id) ? 'ring-2 ring-blue-500 ring-offset-1' : ''
+                }`}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={(e) => openFileMenu(e, file.id)}
-                    className="file-menu-btn p-1 border border-black bg-white text-slate-500 hover:bg-slate-100 transition-colors shrink-0"
-                    title="Actions"
-                  >
-                    <MoreHorizontal className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(file.id)}
+                      onChange={() => toggleSelect(file.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-3.5 h-3.5 accent-black cursor-pointer shrink-0"
+                      aria-label={`Select ${file.name}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => openFileMenu(e, file.id)}
+                      className="file-menu-btn p-1 border border-black bg-white text-slate-500 hover:bg-slate-100 transition-colors shrink-0"
+                      title="Actions"
+                    >
+                      <MoreHorizontal className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                   {file.starred && <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />}
                 </div>
                 <button
@@ -871,23 +1171,44 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
       )}
 
       {moveDialogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setMoveDialogOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !bulkBusy && setMoveDialogOpen(false)}>
           <div className="bg-white border-2 border-black shadow-[8px_8px_0px_rgba(0,0,0,1)] w-full max-w-md mx-4 relative" onClick={(e) => e.stopPropagation()}>
             <div className="bg-black text-white px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Move className="w-5 h-5 text-blue-400" />
-                <h2 className="font-extrabold text-[12px] tracking-normal">Move File</h2>
+                <h2 className="font-extrabold text-[12px] tracking-normal">
+                  {moveIsMulti ? `Move ${moveFileIds.length} Items` : 'Move File'}
+                </h2>
               </div>
-              <button onClick={() => setMoveDialogOpen(false)} className="text-white hover:text-slate-300 transition-colors">
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => setMoveDialogOpen(false)}
+                className="text-white hover:text-slate-300 transition-colors"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-6 space-y-5">
+              {!moveAccountsUniform && (
+                <p className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-400 px-3 py-2">
+                  Selected files span multiple accounts — use Different Account to move them all to one target.
+                </p>
+              )}
               <div className="flex gap-2">
-                <button onClick={() => setMoveMode('same')} className={`flex-1 py-2 text-[10px] font-semibold tracking-normal border ${moveMode === 'same' ? 'bg-black text-white border-black shadow-[2px_2px_0px_#3b82f6]' : 'bg-white text-slate-500 border-slate-300 hover:border-black'}`}>
+                <button
+                  type="button"
+                  disabled={!moveAccountsUniform}
+                  onClick={() => setMoveMode('same')}
+                  className={`flex-1 py-2 text-[10px] font-semibold tracking-normal border disabled:opacity-40 disabled:cursor-not-allowed ${moveMode === 'same' ? 'bg-black text-white border-black shadow-[2px_2px_0px_#3b82f6]' : 'bg-white text-slate-500 border-slate-300 hover:border-black'}`}
+                >
                   Same Account
                 </button>
-                <button onClick={() => setMoveMode('across')} className={`flex-1 py-2 text-[10px] font-semibold tracking-normal border ${moveMode === 'across' ? 'bg-black text-white border-black shadow-[2px_2px_0px_#3b82f6]' : 'bg-white text-slate-500 border-slate-300 hover:border-black'}`}>
+                <button
+                  type="button"
+                  onClick={() => setMoveMode('across')}
+                  className={`flex-1 py-2 text-[10px] font-semibold tracking-normal border ${moveMode === 'across' ? 'bg-black text-white border-black shadow-[2px_2px_0px_#3b82f6]' : 'bg-white text-slate-500 border-slate-300 hover:border-black'}`}
+                >
                   Different Account
                 </button>
               </div>
@@ -897,9 +1218,11 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
                   <label className="block text-[10px] font-semibold text-black tracking-normal mb-1.5 ">Target Account</label>
                   <select value={moveTargetAccountId || ''} onChange={(e) => setMoveTargetAccountId(e.target.value || null)} className="w-full h-10 border-2 border-black px-3 text-[11px] font-bold bg-white focus:outline-none">
                     <option value="">Select account...</option>
-                    {accounts.filter((a) => a.id !== localFiles.find((f) => f.id === moveFileId)?.accountId).map((a) => (
-                      <option key={a.id} value={a.id}>{a.email}</option>
-                    ))}
+                    {accounts
+                      .filter((a) => !(moveAccountsUniform && a.id === moveSourceAccountId))
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>{a.email}</option>
+                      ))}
                   </select>
                 </div>
               )}
@@ -909,17 +1232,21 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
                 <select value={moveTargetFolderId || ''} onChange={(e) => setMoveTargetFolderId(e.target.value || null)} className="w-full h-10 border-2 border-black px-3 text-[11px] font-bold bg-white focus:outline-none">
                   <option value="">Root folder</option>
                   {(() => {
-                    const moveFile = localFiles.find((f) => f.id === moveFileId);
                     let folders = allFolders;
                     if (moveMode === 'across' && moveTargetAccountId) {
                       folders = allFolders.filter((f) => f.accountId === moveTargetAccountId);
-                    } else if (moveMode === 'same' && moveFile?.accountId) {
-                      // Same account: only folders under that account
-                      folders = allFolders.filter((f) => f.accountId === moveFile.accountId);
+                    } else if (moveMode === 'same' && moveSourceAccountId) {
+                      folders = allFolders.filter((f) => f.accountId === moveSourceAccountId);
                     }
-                    // Extra safety: never list shared folders when feature is off
                     if (!showSharedFiles) {
                       folders = folders.filter((f) => f.isOwned !== false);
+                    }
+                    // Don't offer a selected folder as its own destination when moving a single folder
+                    if (!moveIsMulti && moveFileIds[0]) {
+                      const moving = localFiles.find((f) => f.id === moveFileIds[0]);
+                      if (moving?.isFolder) {
+                        folders = folders.filter((f) => f.providerId !== moving.providerId);
+                      }
                     }
                     return folders.map((f) => (
                       <option key={f.id} value={f.providerId}>{f.name}</option>
@@ -929,11 +1256,22 @@ export default function FileManagerView({ accounts, refreshTick, onOpenUploadMod
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
-                <button onClick={() => setMoveDialogOpen(false)} className="px-4 py-2 border border-black bg-white text-slate-600 hover:bg-slate-50 text-[10px] font-semibold tracking-normal shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-0.5 transition-all">
+                <button
+                  type="button"
+                  disabled={bulkBusy}
+                  onClick={() => setMoveDialogOpen(false)}
+                  className="px-4 py-2 border border-black bg-white text-slate-600 hover:bg-slate-50 text-[10px] font-semibold tracking-normal shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-0.5 transition-all disabled:opacity-50"
+                >
                   Cancel
                 </button>
-                <button onClick={submitMove} className="geo-btn-primary text-[10px] flex items-center gap-1.5">
-                  <Move className="w-3.5 h-3.5" /> Move
+                <button
+                  type="button"
+                  disabled={bulkBusy || (moveMode === 'across' && !moveTargetAccountId)}
+                  onClick={() => void submitMove()}
+                  className="geo-btn-primary text-[10px] flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {bulkBusy ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Move className="w-3.5 h-3.5" />}
+                  {moveIsMulti ? `Move ${moveFileIds.length}` : 'Move'}
                 </button>
               </div>
             </div>

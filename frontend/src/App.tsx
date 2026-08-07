@@ -17,7 +17,16 @@ import {
   type UserSettings,
   type ThemeMode,
 } from './settings';
-import { Cloud, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
+import { Cloud, RefreshCw, CheckCircle, XCircle, X } from 'lucide-react';
+
+type SyncAccountProgress = {
+  id: string;
+  email: string;
+  label: string;
+  color: string;
+  status: 'pending' | 'syncing' | 'success' | 'error';
+  detail?: string;
+};
 
 function categorizeMimeType(mimeType: string, isFolder: boolean): string {
   if (isFolder) return 'other';
@@ -86,6 +95,8 @@ export default function App() {
   const [isConnectOpen, setIsConnectOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [syncNotification, setSyncNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [syncProgressOpen, setSyncProgressOpen] = useState(false);
+  const [syncProgressItems, setSyncProgressItems] = useState<SyncAccountProgress[]>([]);
   const [splashProgress, setSplashProgress] = useState(0);
   const [splashDone, setSplashDone] = useState(false);
   const [userSettings, setUserSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
@@ -191,16 +202,21 @@ export default function App() {
     }
   };
 
-  const handleSyncAccount = async (accountId: string): Promise<'SYNCED' | 'ERROR'> => {
+  const handleSyncAccount = async (accountId: string): Promise<'SYNCED' | 'ERROR' | string> => {
     try {
       const res = await apiFetch(`/api/accounts/${accountId}/sync`, { method: 'POST' });
       if (res.ok) {
         const body = await res.json();
-        return body.data?.syncStatus === 'SYNCED' ? 'SYNCED' : 'ERROR';
+        if (body.data?.syncStatus === 'SYNCED') {
+          const n = body.data?.totalIndexed;
+          return typeof n === 'number' ? `SYNCED:${n}` : 'SYNCED';
+        }
+        return 'ERROR';
       }
-      return 'ERROR';
-    } catch {
-      return 'ERROR';
+      const body = await res.json().catch(() => ({}));
+      return body.error?.message || 'ERROR';
+    } catch (e) {
+      return e instanceof Error ? e.message : 'ERROR';
     }
   };
 
@@ -210,16 +226,111 @@ export default function App() {
     setTimeout(() => setSyncNotification(null), 4000);
   };
 
+  const updateSyncItem = (id: string, patch: Partial<SyncAccountProgress>) => {
+    setSyncProgressItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  };
+
   const handleSyncAllAccounts = async () => {
+    if (accounts.length === 0 || isSyncing) return;
+
     setIsSyncing(true);
-    const results = await Promise.all(accounts.map((a) => handleSyncAccount(a.id)));
-    const failedAccounts = accounts.filter((_, i) => results[i] === 'ERROR').map((a) => a.email.split('@')[0]);
-    await fetchAllData(true);
-    if (failedAccounts.length === 0) {
-      showSyncToast(`All ${accounts.length} account${accounts.length > 1 ? 's' : ''} synced successfully`, 'success');
-    } else {
-      showSyncToast(`${failedAccounts.join(', ')} failed to sync`, 'error');
+    setSyncNotification(null);
+    const initial: SyncAccountProgress[] = accounts.map((a) => ({
+      id: a.id,
+      email: a.email,
+      label: a.email.split('@')[0] || a.email,
+      color: a.color,
+      status: 'pending',
+    }));
+    setSyncProgressItems(initial);
+    setSyncProgressOpen(true);
+
+    let failCount = 0;
+
+    // Sequential so the panel shows clear account-by-account progress
+    for (const account of accounts) {
+      updateSyncItem(account.id, { status: 'syncing', detail: 'Indexing Drive…' });
+      setAccounts((prev) =>
+        prev.map((a) => (a.id === account.id ? { ...a, syncStatus: 'SYNCING' } : a)),
+      );
+
+      const result = await handleSyncAccount(account.id);
+
+      if (typeof result === 'string' && result.startsWith('SYNCED')) {
+        const indexed = result.includes(':') ? result.split(':')[1] : undefined;
+        updateSyncItem(account.id, {
+          status: 'success',
+          detail: indexed ? `${indexed} items indexed` : 'Synced',
+        });
+        setAccounts((prev) =>
+          prev.map((a) =>
+            a.id === account.id ? { ...a, syncStatus: 'SYNCED', lastSyncedAt: new Date().toISOString() } : a,
+          ),
+        );
+      } else {
+        failCount += 1;
+        const errMsg = result === 'ERROR' || !result ? 'Sync failed' : String(result);
+        updateSyncItem(account.id, { status: 'error', detail: errMsg });
+        setAccounts((prev) =>
+          prev.map((a) => (a.id === account.id ? { ...a, syncStatus: 'ERROR' } : a)),
+        );
+      }
     }
+
+    await fetchAllData(true);
+    setIsSyncing(false);
+
+    if (failCount === 0) {
+      showSyncToast(
+        `All ${accounts.length} account${accounts.length > 1 ? 's' : ''} synced successfully`,
+        'success',
+      );
+    } else {
+      showSyncToast(
+        `${failCount} of ${accounts.length} account${accounts.length > 1 ? 's' : ''} failed to sync`,
+        'error',
+      );
+    }
+  };
+
+  const handleSyncOneAccount = async (accountId: string) => {
+    const account = accounts.find((a) => a.id === accountId);
+    if (!account || isSyncing) return;
+
+    setIsSyncing(true);
+    setSyncNotification(null);
+    setSyncProgressItems([
+      {
+        id: account.id,
+        email: account.email,
+        label: account.email.split('@')[0] || account.email,
+        color: account.color,
+        status: 'syncing',
+        detail: 'Indexing Drive…',
+      },
+    ]);
+    setSyncProgressOpen(true);
+    setAccounts((prev) =>
+      prev.map((a) => (a.id === accountId ? { ...a, syncStatus: 'SYNCING' } : a)),
+    );
+
+    const result = await handleSyncAccount(accountId);
+
+    if (typeof result === 'string' && result.startsWith('SYNCED')) {
+      const indexed = result.includes(':') ? result.split(':')[1] : undefined;
+      updateSyncItem(accountId, {
+        status: 'success',
+        detail: indexed ? `${indexed} items indexed` : 'Synced',
+      });
+      showSyncToast(`${account.email.split('@')[0]} synced successfully`, 'success');
+    } else {
+      const errMsg = result === 'ERROR' || !result ? 'Sync failed' : String(result);
+      updateSyncItem(accountId, { status: 'error', detail: errMsg });
+      showSyncToast(`${account.email.split('@')[0]}: ${errMsg}`, 'error');
+    }
+
+    await fetchAllData(true);
+    setIsSyncing(false);
   };
 
   const refreshStorageOnly = async () => {
@@ -358,7 +469,99 @@ export default function App() {
         accounts={accounts}
         uploadMode={userSettings.uploadMode}
       />
-      {syncNotification && (
+      {syncProgressOpen && syncProgressItems.length > 0 && (() => {
+        const done = syncProgressItems.filter((i) => i.status === 'success' || i.status === 'error').length;
+        const total = syncProgressItems.length;
+        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+        const allDone = done === total && !isSyncing;
+        const anyError = syncProgressItems.some((i) => i.status === 'error');
+        return (
+          <div className="fixed bottom-6 right-6 z-[100] w-[min(100vw-2rem,22rem)]">
+            <div className="bg-white border-2 border-black shadow-[6px_6px_0px_rgba(0,0,0,1)] overflow-hidden">
+              <div className="bg-black text-white px-4 py-3 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-extrabold tracking-normal">
+                    {allDone ? (anyError ? 'Sync finished with errors' : 'Sync complete') : 'Syncing accounts'}
+                  </p>
+                  <p className="text-[9px] font-mono font-bold text-slate-300 mt-0.5">
+                    {done} / {total} accounts · {pct}%
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSyncProgressOpen(false)}
+                  className="text-white hover:text-slate-300 shrink-0 p-1"
+                  title="Dismiss"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="px-4 pt-3 pb-2">
+                <div className="h-3 w-full bg-slate-100 border-2 border-black overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 ${anyError && allDone ? 'bg-red-500' : allDone ? 'bg-emerald-500' : 'bg-blue-500 geo-stripes'}`}
+                    style={{ width: `${Math.max(pct, isSyncing && pct === 0 ? 8 : pct)}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="px-4 pb-4 max-h-56 overflow-y-auto space-y-2.5">
+                {syncProgressItems.map((item) => {
+                  const rowPct =
+                    item.status === 'success' || item.status === 'error'
+                      ? 100
+                      : item.status === 'syncing'
+                        ? 55
+                        : 0;
+                  const barCls =
+                    item.status === 'success'
+                      ? 'bg-emerald-500'
+                      : item.status === 'error'
+                        ? 'bg-red-500'
+                        : item.status === 'syncing'
+                          ? 'bg-blue-500 geo-stripes animate-pulse'
+                          : 'bg-slate-300';
+                  return (
+                    <div key={item.id} className="border border-black p-2.5 bg-slate-50">
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className="w-2.5 h-2.5 border border-black shrink-0"
+                            style={{ backgroundColor: item.color }}
+                          />
+                          <span className="text-[10px] font-extrabold truncate text-black">{item.label}</span>
+                        </div>
+                        <span className="shrink-0">
+                          {item.status === 'syncing' && <RefreshCw className="w-3.5 h-3.5 text-blue-600 animate-spin" />}
+                          {item.status === 'success' && <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />}
+                          {item.status === 'error' && <XCircle className="w-3.5 h-3.5 text-red-600" />}
+                          {item.status === 'pending' && <span className="text-[8px] font-mono font-bold text-slate-400">WAIT</span>}
+                        </span>
+                      </div>
+                      <div className="h-2 w-full bg-white border border-black overflow-hidden mb-1">
+                        <div className={`h-full transition-all duration-500 ${barCls}`} style={{ width: `${rowPct}%` }} />
+                      </div>
+                      <p
+                        className={`text-[8px] font-bold truncate ${
+                          item.status === 'error' ? 'text-red-600' : item.status === 'success' ? 'text-emerald-700' : 'text-slate-500'
+                        }`}
+                      >
+                        {item.status === 'pending' && 'Queued…'}
+                        {item.status === 'syncing' && (item.detail || 'Syncing…')}
+                        {item.status === 'success' && (item.detail || 'Success')}
+                        {item.status === 'error' && (item.detail || 'Error')}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {syncNotification && !syncProgressOpen && (
         <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-bottom-2 fade-in">
           <div className={`bg-white border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] px-5 py-3.5 flex items-center gap-3 min-w-[280px] max-w-sm`}>
             <div className={`w-8 h-8 border border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0px_rgba(0,0,0,1)] ${syncNotification.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`}>
@@ -398,7 +601,9 @@ export default function App() {
             onOpenConnectModal={() => setIsConnectOpen(true)}
             onRefreshAllData={() => fetchAllData(true)}
             onDisconnectAccount={handleDisconnectAccount}
-            onSyncAccount={handleSyncAccount}
+            onSyncAccount={handleSyncOneAccount}
+            onSyncAll={handleSyncAllAccounts}
+            isSyncing={isSyncing}
             onLogout={handleLogout}
           />
         );
